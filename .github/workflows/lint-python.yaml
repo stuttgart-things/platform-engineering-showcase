@@ -1,5 +1,5 @@
 ---
-name: dagger
+name: python lint
 on:
   workflow_dispatch:
     inputs:
