@@ -7,18 +7,22 @@ on:
         required: false
         default: main
         type: string
+        description: Branch to run the workflow on
       runs-on:
         required: false
         type: string
         default: dagger
+        description: Runner to use for the workflow
       continue-error:
         default: false
         required: true
         type: boolean
+        description: Continue even if the linting fails
       app-directory:
         required: true
         type: string
         default: dagger/python-webapp
+        description: Directory of the Python application to lint
 
 jobs:
   lint-python:

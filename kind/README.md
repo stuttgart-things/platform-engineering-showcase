@@ -2,6 +2,8 @@
 
 ## PLATFORM CLUSTER
 
+```bash
+# CREATE CLUSTER
 KUBECONFIG_PATH=~/.kube/kind-platform
 
 mkdir -p ~/.kube || true
@@ -10,8 +12,8 @@ kind create cluster \
 --config platform-cluster.yaml \
 --kubeconfig ${KUBECONFIG_PATH}
 
-
 export KUBECONFIG=${KUBECONFIG_PATH}
+kubectl get nodes
 
 ## DEPLOY CLUSTER-INFRA
 
@@ -28,12 +30,12 @@ for cmd in apply sync; do
     sleep 15
   done
 done
+
+kubectl get nodes
 ```
 
-## DEPLOY CROSSPLANE
 
+```bash
+# DELETE
+kind delete clusters platform-cluster
 ```
-helmfile apply -f crossplane.yaml
-```
-
-## CONFIGURE CROSSPLANE

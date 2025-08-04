@@ -1,4 +1,4 @@
-# platform-engineering-showcase
+# stuttgart-things/platform-engineering-showcase
 
 platform-engineering-showcase
 
@@ -15,5 +15,5 @@ platform-engineering-showcase
 ```yaml
 ---
 authors:
-  - Patrick Hermann, stuttgart-things 03/2025
+  - Patrick Hermann, stuttgart-things 08/2025
 ```

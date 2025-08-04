@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY app.py .
 
-RUN pip install --no-cache-dir flask
+RUN pip install --no-cache-dir flask==3.1.1
 
 EXPOSE 5000
 

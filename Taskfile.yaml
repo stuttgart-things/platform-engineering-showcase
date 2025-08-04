@@ -9,8 +9,8 @@ vars:
 tasks:
   commit:
     desc: Commit + push code into branch
-    # deps:
-    #   - check
+    deps:
+      - check
     cmds:
       - git branch --set-upstream-to=origin/{{ .BRANCH }}
       - git pull
@@ -66,3 +66,32 @@ tasks:
       - |
         task=$(yq e '.tasks | keys' Taskfile.yaml | sed 's/^- //' | gum choose)
         task ${task}
+
+  check:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - pre-commit run -a
+
+  run-pre-commit-hook:
+    deps:
+      - check
+    desc: "Run the pre-commit hook script to replace .example.com with .example.com"
+    cmds:
+      - |
+        # Find all YAML files in the repository recursively, excluding Taskfile.yaml
+        files=$(find . -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.yml" -o -name "*.md" \) ! -name "Taskfile.yaml")
+
+        # Loop through each file
+        for file in $files; do
+          # Skip binary files
+          if file "$file" | grep -q "text"; then
+            # Replace the string and update the file
+            sed -i 's/\.sva\.de/\.example\.com/g' "$file"
+          fi
+        done
+
+        # Add all modified YAML files back to staging
+        git add $(git ls-files --modified | grep -E '\.ya?ml$')
+
+        exit 0
+    silent: false

@@ -1,0 +1,17 @@
+---
+helmDefaults:
+  verify: false
+  wait: true
+  timeout: 600
+  recreatePods: false
+  force: true
+
+helmfiles:
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/argocd.yaml.gotmpl
+    values:
+      - version: 8.2.5
+      - serviceType: NodePort
+      - nodePortHttp: 31443
+      - namespace: argocd
+      - argocdServerAdminPassword: ""
+      - argocdServerAdminPasswordMtime: ""

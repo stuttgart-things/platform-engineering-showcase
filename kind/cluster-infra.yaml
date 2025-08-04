@@ -14,9 +14,6 @@ helmfiles:
       - ipRangeStart: 172.18.250.0
       - ipRangeEnd: 172.18.250.50
       - clusterName: platform-cluster
-  - path: git::https://github.com/stuttgart-things/helm.git@infra/ingress-nginx.yaml.gotmpl
-    values:
-      - enableHostPort: true
   - path: git::https://github.com/stuttgart-things/helm.git@infra/cert-manager.yaml.gotmpl
     values:
       - config: selfsigned

@@ -16,20 +16,27 @@ nodes:
         nodeRegistration:
           kubeletExtraArgs:
             node-labels: "ingress-ready=true"
-    extraPortMappings:
-      - containerPort: 80
-        hostPort: 8080
-        protocol: TCP
-      - containerPort: 443
-        hostPort: 4443
-        protocol: TCP
   - role: worker
     image: kindest/node:v1.33.2
+    extraPortMappings:
+      - containerPort: 31443 # Argo CD dashboard
+        hostPort: 31443
+      - containerPort: 31444 # Kargo dashboard
+        hostPort: 31444
+      - containerPort: 31445 # External webhooks server
+        hostPort: 31445
+      - containerPort: 30081 # test application instance
+        hostPort: 30081
+      - containerPort: 30082 # UAT application instance
+        hostPort: 30082
+      - containerPort: 30083 # prod application instance
+        hostPort: 30083
     extraMounts:
       - hostPath: /mnt/platform-cluster1  # Host directory to mount
-        containerPath: /data       # Mount path inside the KinD node
+        containerPath: /data              # Mount path inside the KinD node
+
   - role: worker
     image: kindest/node:v1.33.2
     extraMounts:
       - hostPath: /mnt/platform-cluster2  # Host directory to mount
-        containerPath: /data       # Mount path inside the KinD node
+        containerPath: /data              # Mount path inside the KinD node

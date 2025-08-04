@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slides-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slides
+  template:
+    metadata:
+      labels:
+        app: slides
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.28.0
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: static-content  # Updated volume name
+              mountPath: /usr/share/nginx/html  # Nginx static content directory
+      volumes:
+        - name: static-content  # Updated volume name
+          image:
+            reference: ghcr.io/stuttgart-things/dagger:20250613-095510
+            pullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dagger-slides
+spec:
+  selector:
+    app: slides
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
