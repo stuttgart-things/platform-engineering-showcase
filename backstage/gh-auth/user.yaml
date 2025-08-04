@@ -1,0 +1,14 @@
+# https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/acme/team-a-group.yaml
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: patrick-hermann-sva
+spec:
+  profile:
+    email: patrick-hermann-sva@example.com
+    picture: https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=transparent
+  memberOf: [team-a]
+
+
+mkdir -p catalog/entities
+cp user.yaml catalog/entities/breanna-davison.yaml
