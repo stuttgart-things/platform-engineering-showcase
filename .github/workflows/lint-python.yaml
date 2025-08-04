@@ -1,0 +1,42 @@
+---
+name: dagger
+on:
+  workflow_dispatch:
+    inputs:
+      branch-name:
+        required: false
+        default: main
+        type: string
+      runs-on:
+        required: false
+        type: string
+        default: dagger
+      continue-error:
+        default: false
+        required: true
+        type: boolean
+      app-directory:
+        required: true
+        type: string
+        default: dagger/python-webapp
+
+jobs:
+  build-publish:
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: '0'
+          ref: ${{ inputs.branch-name }}
+
+      - name: Call Dagger Function to lint Python code
+        uses: dagger/dagger-for-github@8.0.0
+        with:
+          version: v0.18.14
+          verb: call
+          module: github.com/act3-ai/dagger/python@python/v0.1.4
+          args: --src ${{ inputs.app-directory }} lint --ignore-error=${{ inputs.continue-error }}
