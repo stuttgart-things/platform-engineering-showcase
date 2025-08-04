@@ -1,0 +1,7 @@
+helmfiles:
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/crossplane.yaml.gotmpl
+    values:
+      - namespace: crossplane-system
+      - providers:
+          - xpkg.upbound.io/crossplane-contrib/provider-helm:v0.21.0
+          - xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.18.0
