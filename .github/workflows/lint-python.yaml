@@ -21,7 +21,7 @@ on:
         default: dagger/python-webapp
 
 jobs:
-  build-publish:
+  lint-python:
     runs-on: ${{ inputs.runs-on }}
     permissions:
       contents: read
