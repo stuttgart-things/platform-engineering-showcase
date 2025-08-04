@@ -1,6 +1,5 @@
 # KIND
 
-
 ## PLATFORM CLUSTER
 
 KUBECONFIG_PATH=~/.kube/kind-platform
@@ -36,3 +35,5 @@ done
 ```
 helmfile apply -f crossplane.yaml
 ```
+
+## CONFIGURE CROSSPLANE

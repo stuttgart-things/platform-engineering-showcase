@@ -17,8 +17,7 @@ npx @backstage/create-app
 
 https://backstage.io/docs/auth/github/provider
 
-export AUTH_GITHUB_CLIENT_ID=Ov23li7kfy0tfiKKsZzp
-export AUTH_GITHUB_CLIENT_SECRET=88d15cecb26c2d35c9c2218cf917a8e7347d8c42
+
 
 
 Homepage URL: http://localhost:3000
