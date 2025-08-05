@@ -10,5 +10,4 @@ npx?
 npm install --global yarn
 npx @backstage/create-app
 
-
 ```

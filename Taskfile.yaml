@@ -7,6 +7,18 @@ vars:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
 
 tasks:
+  create-dagger:
+    desc: Create new dagger module
+    cmds:
+      - dagger init --sdk={{ .SDK }} --source=./.dagger/{{ .MODULE_NAME }} --name={{ .MODULE_NAME }}
+      - jq '.source = "."' dagger.json > tmp.json && mv tmp.json dagger.json
+      - mv dagger.json ./.dagger/{{ .MODULE_NAME }}/dagger.json
+    vars:
+      MODULE_NAME:
+        sh: gum input --placeholder "Module name"
+      SDK:
+        sh: gum choose "go" "python"
+
   commit:
     desc: Commit + push code into branch
     deps:
