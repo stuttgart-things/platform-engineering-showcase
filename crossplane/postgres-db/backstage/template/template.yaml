@@ -67,7 +67,7 @@ spec:
         repoUrl: github.com?owner=stuttgart-things&repo=platform-engineering-showcase
         branchName: db-${{ parameters.db_name }}
         title: db-${{ parameters.db_name }}
-        description: CREATE db-${{ parameters.db_name }} with Crossplane
+        description: Add db-${{ parameters.db_name }} [Crossplane]
         targetPath: crossplane/postgres-db
         token: ${{ secrets.githubToken }}
 
