@@ -1,0 +1,8 @@
+---
+global:
+  postgresql:
+    auth:
+      postgresPassword: volki123
+      username: volki
+      password: volki123
+      database: volki

@@ -10,10 +10,10 @@ cat <<EOF > values.yaml
 global:
   postgresql:
     auth:
-      postgresPassword: volki123
-      username: volki
-      password: volki123
-      database: volki
+      postgresPassword: platformEngineer
+      username: dev
+      password: platformEngineer
+      database: dev
 EOF
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -57,11 +57,11 @@ apiVersion: v1
 kind: Secret
 type: kubernetes.io/basic-auth
 metadata:
-  name: volki-postgres-secret
+  name: dev-postgres-secret
   namespace: xplane
 stringData:
   username: postgres
-  password: volki123
+  password: platformEngineer
   endpoint: postgresql.xplane.svc.cluster.local
   port: "5432"
 EOF
@@ -81,7 +81,7 @@ spec:
     source: PostgreSQLConnectionSecret
     connectionSecretRef:
       namespace: xplane
-      name: volki-postgres-secret
+      name: dev-postgres-secret
 EOF
 ```
 

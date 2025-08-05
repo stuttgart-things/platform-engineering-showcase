@@ -1,0 +1,6 @@
+---
+helmfiles:
+  - path: git::https://github.com/stuttgart-things/helm.git@database/postgres.yaml.gotmpl
+    values:
+      - namespace: postgres
+      - version: 0.24.0

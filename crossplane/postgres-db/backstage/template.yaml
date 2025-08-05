@@ -1,0 +1,86 @@
+---
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgresdb
+  title: postgresdb
+  description: Creates postgresdb
+spec:
+  owner: development
+  type: service
+  parameters:
+    - title: Fill in some steps
+      required:
+        - db_name
+        - role_name
+        - deletion_policy
+      properties:
+        db_name:
+          title: DB name
+          type: string
+          description: DB name
+          pattern: '^([a-zA-Z][a-zA-Z0-9]*)(-[a-zA-Z0-9]+)*$'
+        role_name:
+          title: Role name
+          type: string
+          description: Role Name
+        deletion_policy:
+          title: deletion policy
+          type: string
+          description: deletion policy
+          enum:
+            - Orphan
+            - Delete
+
+  steps:
+    - id: fetch-base
+      name: Fetch Base
+      action: fetch:template
+      input:
+        url: ./template
+        values:
+          db_name: ${{ parameters.db_name }}
+          role_name: ${{ parameters.role_name }}
+          deletion_policy: ${{ parameters.deletion_policy }}
+
+    - id: fetch-existing-catalog
+      name: Fetch Existing Catalog
+      action: fetch:plain:file
+      input:
+        url: https://codehub.sva.de/Lab/stuttgart-things/idp/resource-engines/-/blob/main/catalog-info.yaml       https://github.com/stuttgart-things/platform-engineering-showcase/blob/main/crossplane/catalog-info.yaml
+        targetPath: ./catalog-info.yaml
+
+    - id: add-group-to-catalog
+      action: roadiehq:utils:merge
+      input:
+        path: ./catalog-info.yaml
+        mergeArrays: true
+        content:
+          spec:
+            targets:
+              - ./services/database/postgresdb/${{ parameters.db_name }}/catalog-info.yaml
+
+    #- id: register-entity
+    #  name: Register catalog-info.yaml in Location
+    #  action: roadiehq:utils:fs:append
+    #  input:
+    #    path: ./catalog-info.yaml
+    #    content: |
+    #      - ./services/database/postgresdb/${{ parameters.db_name }}/catalog-info.yaml
+
+    - id: create-pull-request
+      name: create-pull-request
+      action: publish:gitlab:merge-request
+      input:
+        repoUrl: codehub.sva.de?owner=Lab/stuttgart-things/idp&repo=resource-engines
+        branchName: DB-${{ parameters.db_name }}
+        title: DB-${{ parameters.db_name }}
+        description: CREATE DB-${{ parameters.db_name }} w/ crossplane
+        # token: ${{ secrets.oauth_token }}
+
+  output:
+    text:
+      - title: Accept Merge Request
+        content: |
+          Your New Application Request has been published to GitLab
+            To finish deploying the application, review and accept the [pull request](${{ steps['publish'].output.remoteUrl }})

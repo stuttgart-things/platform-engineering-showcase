@@ -1,0 +1,9 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: postgresdb
+  description: A collection of all postgresdb entities
+spec:
+  targets:
+    - ./crossplane/postgres-db/services/app.yaml
