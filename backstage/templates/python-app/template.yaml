@@ -43,7 +43,7 @@ spec:
         values:
           description: ${{ parameters.description }}
           repoName: ${{ parameters.repoName }}
-          repoUrl: ${{ parameters.repoUrl }}
+          repoOwner: ${{ parameters.repoOwner }}
 
     - id: publish
       name: Publish to GitHub
