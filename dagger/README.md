@@ -41,3 +41,14 @@ dagger call -m https://github.com/stuttgart-things/dagger/trivy@v0.31.1 scan-ima
 --progress plain -vv \
 export --path=/tmp/python-webapp-trivy.json
 ```
+
+
+
+dagger call -m . run-pr-check --policy /home/sthings/projects/bosch/platform-engineering-showcase/kyverno/policies --source /tmp/platform-engineering-showcase/  -vv --progress plain
+
+dagger call -m . kyverno-validation --policy /home/sthings/projects/bosch/platform-engineering-showcase/kyverno/policies --resource /home/sthings/projects/bosch/platform-engineering-showcase/crossplane/postgres-db/backstage/resources -vv --progress plain
+
+
+dagger call -m . get-changed-files --source /tmp/platform-engineering-showcase -vv --progress plain
+
+dagger call -m github.com/stuttgart-things/dagger/kyverno@v0.31.2 validate --policy /home/sthings/projects/bosch/platform-engineering-showcase/kyverno/policies --resource /home/sthings/projects/bosch/platform-engineering-showcase/crossplane/postgres-db/backstage/resources -vv --progress plain
