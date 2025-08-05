@@ -1,0 +1,27 @@
+---
+name: check pr
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-pr:
+    runs-on: dagger
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: '0'
+          ref: ${{ github.ref_name }}
+
+      - name: Run Dagger PR Check
+        uses: dagger/dagger-for-github@8.0.0
+        with:
+          version: v0.18.14
+          verb: call
+          module: ./dagger/postgresdb
+          args: run-pr-check --source . --policy kyverno/policies -vv --progress plain
