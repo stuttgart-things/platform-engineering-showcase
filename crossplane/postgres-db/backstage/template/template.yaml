@@ -1,0 +1,79 @@
+---
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgresdb
+  title: postgresdb
+  description: Creates postgresdb
+spec:
+  owner: development
+  type: service
+  parameters:
+    - title: Fill in some steps
+      required:
+        - db_name
+        - role_name
+        - deletion_policy
+      properties:
+        db_name:
+          title: DB name
+          type: string
+          description: DB name
+          pattern: '^([a-zA-Z][a-zA-Z0-9]*)(-[a-zA-Z0-9]+)*$'
+        role_name:
+          title: Role name
+          type: string
+          description: Role Name
+        deletion_policy:
+          title: deletion policy
+          type: string
+          description: deletion policy
+          enum:
+            - Orphan
+            - Delete
+
+  steps:
+    - id: fetch-base
+      name: Fetch Base
+      action: fetch:template
+      input:
+        url: ./template
+        values:
+          db_name: ${{ parameters.db_name }}
+          role_name: ${{ parameters.role_name }}
+          deletion_policy: ${{ parameters.deletion_policy }}
+
+    # - id: fetch-existing-catalog
+    #   name: Fetch Existing Catalog
+    #   action: fetch:plain:file
+    #   input:
+    #     url: https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/main/crossplane/postgres-db/backstage/catalog-info.yaml
+    #     targetPath: ./catalog-info.yaml
+
+    # - id: add-group-to-catalog
+    #   action: roadiehq:utils:merge
+    #   input:
+    #     path: ./catalog-info.yaml
+    #     mergeArrays: true
+    #     content:
+    #       spec:
+    #         targets:
+    #           - ./services/database/postgresdb/${{ parameters.db_name }}/catalog-info.yaml
+
+    - id: create-pull-request
+      name: Create Pull Request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=stuttgart-things&repo=platform-engineering-showcase
+        branchName: db-${{ parameters.db_name }}
+        title: db-${{ parameters.db_name }}
+        description: CREATE db-${{ parameters.db_name }} with Crossplane
+        targetPath: crossplane/postgres-db
+        token: ${{ secrets.githubToken }}
+
+  output:
+    text:
+      - title: Accept Pull Request
+        content: |
+          Your new Postgres DB request has been published to GitHub.
+          To finish deploying the DB, review and accept the [pull request](${{ steps['create-pull-request'].output.remoteUrl }})

@@ -132,3 +132,33 @@ EOF
 ```
 
 </details>
+
+<details><summary><b>ADD SERVICES TO BACKSTAGE</b></summary>
+
+```bash
+# backstage/app-config.yaml
+- type: url
+  location: url:https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/main/crossplane/postgres-db/catalog-info.yaml
+
+  rules:
+    - allow: [Location]
+- type: file
+  target: catalog-info.yaml
+```
+
+</details>
+
+<details><summary><b>ADD TEMPLATE TO BACKSTAGE</b></summary>
+
+```bash
+# backstage/app-config.yaml
+- type: url
+  location: url:https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/main/crossplane/postgres-db/backstage/catalog-info.yaml
+
+  rules:
+    - allow: [Location]
+- type: file
+  target: catalog-info.yaml
+```
+
+</details>
