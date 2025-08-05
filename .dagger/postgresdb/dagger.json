@@ -1,0 +1,19 @@
+{
+  "name": "postgresdb",
+  "engineVersion": "v0.18.14",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "git-files-changed",
+      "source": "github.com/valorl/daggerverse/git-files-changed@e8b25b9c6589f13b362dcaf94acda967f26f6700",
+      "pin": "e8b25b9c6589f13b362dcaf94acda967f26f6700"
+    },
+    {
+      "name": "kyverno",
+      "source": "github.com/stuttgart-things/dagger/kyverno@v0.31.2",
+      "pin": "50deee19584311be2149b144bc90b0da7309b59f"
+    }
+  ]
+}
