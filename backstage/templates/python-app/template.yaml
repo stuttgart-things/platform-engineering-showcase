@@ -3,26 +3,34 @@ kind: Template
 metadata:
   name: python-app-template
   title: Simple Python App Template
-  description: Scaffold a new Python app and publish to GitHub
+  description: Scaffold a new Python app and publish it to GitHub
 spec:
   owner: team-a
   type: service
 
   parameters:
-    - title: GitHub Repository Details
+    - title: GitHub Repository
       required:
-        - repoName
+        - repoUrl
         - description
-        - owner
+        - visibility
       properties:
-        repoName:
-          title: Repository Name
+        repoUrl:
+          title: GitHub Repository Location
           type: string
+          description: Owner and name for the new repository
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+            requestUserCredentials:
+              secretsKey: USER_OAUTH_TOKEN # pragma: allowlist secret
+              additionalScopes:
+                github:
+                  - repo
+                  - workflow
         description:
-          title: Description
-          type: string
-        owner:
-          title: GitHub Owner (user or org)
+          title: Repository Description
           type: string
         visibility:
           title: Repository Visibility
@@ -30,44 +38,21 @@ spec:
           enum: [public, private]
           default: private
 
-    - title: Choose a location
-      description: |
-        This section will ask for details about the Owner and Repository name which will then be used
-        to create a repository in that location using your GitHub credentials.
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Enter an Owner and Repository Name
-          description: |
-            The Owner should be your GitHub username. The Repository name should be a name that is not one that exists already in your GitHub account.
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            requestUserCredentials:
-              secretsKey: USER_OAUTH_TOKEN # pragma: allowlist secret
-              additionalScopes:
-                github:
-                  - workflow
-            allowedHosts:
-              - github.com
-
   steps:
     - id: fetch-base
-      name: Fetch base
+      name: Fetch template base
       action: fetch:template
       input:
         url: ./skeleton
         targetPath: .
         values:
-          name: ${{ parameters.repoName }}
           description: ${{ parameters.description }}
 
     - id: publish
       name: Publish to GitHub
       action: publish:github
       input:
-        repoUrl: github.com/${{ parameters.owner }}/${{ parameters.repoName }}
+        repoUrl: ${{ parameters.repoUrl }}
         description: ${{ parameters.description }}
         repoVisibility: ${{ parameters.visibility }}
 
