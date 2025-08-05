@@ -31,7 +31,7 @@ spec:
                   - repo
                   - workflow
         name:
-          title: Repository Description
+          title: App name
           type: string
         description:
           title: Repository Description
