@@ -2,7 +2,7 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: python-app-template
-  title: Simple Python App Template
+  title: Create Python App
   description: Scaffold a new Python app and publish it to GitHub
 spec:
   owner: team-a

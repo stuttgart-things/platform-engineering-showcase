@@ -1,7 +1,8 @@
+---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.repoUrl ? values.repoUrl.split('/').slice(-1)[0] : 'default-name' }}
+  name: ${{ values.repoUrl && values.repoUrl.split('/')[-1] || 'default-name' }}
   description: ${{ values.description || 'No description provided' }}
   annotations:
     github.com/project-slug: ${{ values.repoUrl ? values.repoUrl.replace('https://', '').replace('http://', '') : 'unknown/unknown' }}
