@@ -1,12 +1,65 @@
-apiVersion: backstage.io/v1alpha1
-kind: Component
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
 metadata:
-  name: ${{ values.name }}
-  description: ${{ values.description }}
-  annotations:
-    github.com/project-slug: ${{ values.owner }}/${{ values.name }}
-    backstage.io/techdocs-ref: dir:.
+  name: python-app-template
+  title: Simple Python App Template
+  description: Scaffold a new Python app and publish to GitHub
 spec:
-  type: service
   owner: team-a
-  lifecycle: experimental
+  type: service
+
+  parameters:
+    - title: GitHub Repository Details
+      required:
+        - repoName
+        - description
+        - owner
+      properties:
+        repoName:
+          title: Repository Name
+          type: string
+        description:
+          title: Description
+          type: string
+        owner:
+          title: GitHub Owner (user or org)
+          type: string
+        visibility:
+          title: Repository Visibility
+          type: string
+          enum: [public, private]
+          default: private
+
+  steps:
+    - id: fetch-base
+      name: Fetch base
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: .
+        values:
+          name: ${{ parameters.repoName }}
+          description: ${{ parameters.description }}
+
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        repoUrl: github.com/${{ parameters.owner }}/${{ parameters.repoName }}
+        description: ${{ parameters.description }}
+        repoVisibility: ${{ parameters.visibility }}
+
+    - id: register
+      name: Register in Backstage
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in Backstage
+        icon: catalog
+        url: ${{ steps['register'].output.catalogItemUrl }}
