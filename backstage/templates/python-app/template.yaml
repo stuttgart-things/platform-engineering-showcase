@@ -1,3 +1,4 @@
+---
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
@@ -47,6 +48,8 @@ spec:
         targetPath: .
         values:
           description: ${{ parameters.description }}
+          # Critical fix: Pass repoUrl to the template renderer
+          repoUrl: ${{ parameters.repoUrl }}
 
     - id: publish
       name: Publish to GitHub
