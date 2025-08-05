@@ -2,7 +2,7 @@
 global:
   postgresql:
     auth:
-      postgresPassword: volki123
+      postgresPassword: volki123 # pragma: allowlist secret
       username: volki
-      password: volki123
+      password: volki123 # pragma: allowlist secret
       database: volki
