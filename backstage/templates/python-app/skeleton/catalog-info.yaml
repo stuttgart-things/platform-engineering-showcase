@@ -1,10 +1,10 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.repoUrl.split('/').pop() }}
+  name: ${{ values.repoName }}
   description: ${{ values.description }}
   annotations:
-    github.com/project-slug: ${{ values.repoUrl.replace('https://github.com/', '') }}
+    github.com/project-slug: ${{ values.repoOwner }}/ ${{ values.repoName }}
     backstage.io/techdocs-ref: dir:.
 spec:
   type: service

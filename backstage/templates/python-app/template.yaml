@@ -1,4 +1,3 @@
----
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
@@ -12,24 +11,19 @@ spec:
   parameters:
     - title: GitHub Repository
       required:
-        - repoUrl
+        - repoOwner
+        - repoName
         - description
         - visibility
       properties:
-        repoUrl:
-          title: GitHub Repository Location
+        repoOwner:
+          title: GitHub Repository Owner
           type: string
-          description: Owner and name for the new repository
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - github.com
-            requestUserCredentials:
-              secretsKey: USER_OAUTH_TOKEN # pragma: allowlist secret
-              additionalScopes:
-                github:
-                  - repo
-                  - workflow
+          description: Owner or organization of the repository
+        repoName:
+          title: GitHub Repository Name
+          type: string
+          description: Repository name (no spaces or special chars)
         description:
           title: Repository Description
           type: string
@@ -48,14 +42,14 @@ spec:
         targetPath: .
         values:
           description: ${{ parameters.description }}
-          # Critical fix: Pass repoUrl to the template renderer
+          repoName: ${{ parameters.repoName }}
           repoUrl: ${{ parameters.repoUrl }}
 
     - id: publish
       name: Publish to GitHub
       action: publish:github
       input:
-        repoUrl: ${{ parameters.repoUrl }}
+        repoUrl: https://github.com/${{ parameters.repoOwner }}/${{ parameters.repoName }}
         description: ${{ parameters.description }}
         repoVisibility: ${{ parameters.visibility }}
 
