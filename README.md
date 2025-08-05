@@ -1,6 +1,6 @@
 # stuttgart-things/platform-engineering-showcase
 
-platform-engineering-showcase
+composable infrastructure for fast-moving teams
 
 | Category    | Description           |
 |-------------|-----------------------|
@@ -14,6 +14,15 @@ platform-engineering-showcase
 
 ```yaml
 ---
-authors:
-  - Patrick Hermann, stuttgart-things 08/2025
+project:
+  name: platform-engineering-showcase
+  description: composable infrastructure for fast-moving teams
+  license: Apache
+  created: 2025-08-01
+  tags: [devops, dagger, backstage, crossplane, kubernetes]
+  maintainers:
+    - name: Patrick Hermann
+      handle: stuttgart-things
+      location: DE
+      roles: [lead, design, integrator]
 ```

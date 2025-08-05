@@ -1,0 +1,35 @@
+namePrefix: idp-
+namespace: slides
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: idp-deployment
+      - op: replace
+        path: /spec/selector/matchLabels/app
+        value: idp
+      - op: replace
+        path: /spec/template/metadata/labels/app
+        value: idp
+      - op: replace
+        path: /spec/template/spec/volumes/0/image/reference
+        value: ghcr.io/stuttgart-things/idp:20250612-093912
+
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: idp-service
+      - op: replace
+        path: /spec/selector/app
+        value: idp
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 31445

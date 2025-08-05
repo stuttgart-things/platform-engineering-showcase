@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: slides-deployment
+  name: PLACEHOLDER-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: slides
+      app: PLACEHOLDER
   template:
     metadata:
       labels:
-        app: slides
+        app: PLACEHOLDER
     spec:
       containers:
         - name: nginx
@@ -23,19 +23,5 @@ spec:
       volumes:
         - name: static-content
           image:
-            reference: ghcr.io/stuttgart-things/dagger:20250613-095510
+            reference: PLACEHOLDER_IMAGE
             pullPolicy: Always
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dagger-slides
-spec:
-  type: NodePort
-  selector:
-    app: slides
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-      nodePort: 31444  # Exposes the service on this NodePort
