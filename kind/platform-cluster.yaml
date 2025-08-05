@@ -21,11 +21,11 @@ nodes:
     extraPortMappings:
       - containerPort: 31443 # Argo CD dashboard
         hostPort: 31443
-      - containerPort: 31444 # Kargo dashboard
+      - containerPort: 31444 # Dagger slides
         hostPort: 31444
-      - containerPort: 31445 # External webhooks server
+      - containerPort: 31445 # IDP slides
         hostPort: 31445
-      - containerPort: 30081 # test application instance
+      - containerPort: 30081 # Kargo dashboard
         hostPort: 30081
       - containerPort: 30082 # UAT application instance
         hostPort: 30082

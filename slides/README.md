@@ -1,6 +1,9 @@
 # SLIDES
 
+```bash
+kubectl apply -k overlays/idp
+```
 
 ```bash
-echo *.$(kubectl get nodes -o json | jq -r '.items[] | select(.metadata.labels."ingress-ready" == "true") | .status.addresses[] | select(.type == "InternalIP") | .address').nip.io
+kubectl apply -k overlays/dagger
 ```

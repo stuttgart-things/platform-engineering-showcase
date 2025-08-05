@@ -1,0 +1,35 @@
+namePrefix: dagger-
+namespace: default
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: dagger-deployment
+      - op: replace
+        path: /spec/selector/matchLabels/app
+        value: dagger
+      - op: replace
+        path: /spec/template/metadata/labels/app
+        value: dagger
+      - op: replace
+        path: /spec/template/spec/volumes/0/image/reference
+        value: ghcr.io/stuttgart-things/dagger:20250613-095510
+
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: dagger-service
+      - op: replace
+        path: /spec/selector/app
+        value: dagger
+      - op: replace
+        path: /spec/ports/0/nodePort
+        value: 31444
