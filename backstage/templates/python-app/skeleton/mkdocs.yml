@@ -1,0 +1,7 @@
+site_name: ${{ values.name }}
+nav:
+  - Home: index.md
+
+repo_url: https://github.com/stuttgart-things/${{ values.name }}
+edit_uri: edit/main/docs/
+docs_dir: docs
