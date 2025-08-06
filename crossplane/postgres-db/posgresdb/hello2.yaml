@@ -1,0 +1,9 @@
+---
+apiVersion: resources.stuttgart-things.com/v1alpha1
+kind: PostgresDB
+metadata:
+  name: app
+spec:
+  dbName: hello2
+  roleName: hello2
+  deletionPolicy: Orphan
