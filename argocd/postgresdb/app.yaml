@@ -1,0 +1,23 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres-db-xplane
+  namespace: argocd
+spec:
+  destination:
+    name: ''
+    namespace: crossplane-system
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: crossplane/postgres-db/backstage/resources/
+    repoURL: https://github.com/stuttgart-things/platform-engineering-showcase.git
+    targetRevision: HEAD
+    directory:
+      recurse: true
+  sources: []
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false

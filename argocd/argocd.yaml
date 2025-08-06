@@ -13,5 +13,5 @@ helmfiles:
       - serviceType: NodePort
       - nodePortHttp: 31443
       - namespace: argocd
-      - argocdServerAdminPassword: ""
-      - argocdServerAdminPasswordMtime: ""
+      - argocdServerAdminPassword: $2y$10$Uk/mLp2GBAbYgGjHLDM8COirTPj4u0zG7KpJXxzYHcZtmOOK00X2m # pragma: allowlist secret
+      - argocdServerAdminPasswordMtime: 2025-08-06T03:37:51UTC  # pragma: allowlist secret
