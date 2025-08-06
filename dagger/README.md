@@ -10,11 +10,11 @@
 dagger call --src dagger/python-webapp \
 -m github.com/act3-ai/dagger/python@python/v0.1.4 lint
 
-dagger call --src python-webapp \
+dagger call --src dagger/python-webapp \
 -m github.com/act3-ai/dagger/python@python/v0.1.4 lint \
 --skip "ruff-check,pyright,ruff-format,pylint"
 
-dagger call --src python-webapp \
+dagger call --src dagger/python-webapp \
 -m github.com/act3-ai/dagger/python@python/v0.1.4 lint \
 --ignore-error=true
 ```

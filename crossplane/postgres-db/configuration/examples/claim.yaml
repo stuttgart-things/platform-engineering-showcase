@@ -2,8 +2,8 @@
 apiVersion: resources.stuttgart-things.com/v1alpha1
 kind: PostgresDB
 metadata:
-  name: app
+  name: jun
 spec:
-  dbName: app
-  roleName: app
+  dbName: jun
+  roleName: jun
   deletionPolicy: Delete
