@@ -6,4 +6,4 @@ metadata:
   description: A collection of all postgresdb entities
 spec:
   targets:
-    - ./services/app.yaml
+    - ./backstage/services/app.yaml
