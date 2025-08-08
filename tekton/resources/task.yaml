@@ -1,0 +1,20 @@
+---
+# Tekton Pipeline and Task definitions for Gitea integration
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: echo-task
+  namespace: tekton-ci
+spec:
+  params:
+    - name: git-repo-url
+      type: string
+    - name: git-revision
+      type: string
+  steps:
+    - name: echo
+      image: alpine:latest
+      script: |
+        echo "Triggered by Gitea push event"
+        echo "Repo URL: $(params.git-repo-url)"
+        echo "Revision: $(params.git-revision)"

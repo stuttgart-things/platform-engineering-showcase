@@ -1,0 +1,21 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: demo-pipeline
+  namespace: tekton-ci
+spec:
+  params:
+    - name: git-repo-url
+      type: string
+    - name: git-revision
+      type: string
+  tasks:
+    - name: echo
+      taskRef:
+        name: echo-task
+      params:
+        - name: git-repo-url
+          value: $(params.git-repo-url)
+        - name: git-revision
+          value: $(params.git-revision)

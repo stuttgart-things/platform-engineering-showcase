@@ -1,0 +1,11 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: gitea-trigger
+  namespace: tekton-ci
+spec:
+  bindings:
+    - ref: gitea-trigger-binding
+  template:
+    ref: gitea-trigger-template
