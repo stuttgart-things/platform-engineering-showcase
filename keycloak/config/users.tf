@@ -28,7 +28,7 @@ resource "keycloak_user" "testuser" {
   enabled  = true
 
   initial_password {
-    value     = "66WCzbsf9werZBKf8KDhp3aQbEPbYdBLQeVOaJFW"
+    value     = "66WCzbsf9werZBKf8KDhp3aQbEPbYdBLQeVOaJFW" # pragma: allowlist secret
     temporary = false
   }
 }
