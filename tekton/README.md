@@ -85,7 +85,7 @@ kubectl apply -f resources/trigger.yaml
 # CREATES EVENTLISTENER TO LISTEN FOR WEBHOOK EVENTS
 kubectl apply -f resources/event-listener.yaml
 
-# CREATS THE EXPOSE OF THE EVENTLISTENER
+# CREATES THE EXPOSE OF THE EVENTLISTENER
 kubectl apply -f resources/service.yaml
 ```
 
