@@ -86,7 +86,7 @@ kubectl apply -f resources/trigger.yaml
 kubectl apply -f resources/event-listener.yaml
 
 # CREATS THE EXPOSE OF THE EVENTLISTENER
-kubectl apply -f resources/event-listener.yaml
+kubectl apply -f resources/service.yaml
 ```
 
 ## TEST EVENT-TRIGGER (INSIDE CLUSTER)
