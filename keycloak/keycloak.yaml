@@ -1,0 +1,11 @@
+---
+# THIS IS A GIT INCLUDE
+helmfiles:
+  - path: git::https://github.com/stuttgart-things/helm.git@database/keycloak.yaml.gotmpl
+    values:
+      - clusterIssuer: selfsigned
+      - domain: 172.18.0.4.nip.io
+      - ingressClassName: nginx
+      - storageClass: standard
+      - adminUser: admin
+      - adminPassword: {{ env "KEYCLOAK_ADMIN_PASSWORD" | default "admin" }}
