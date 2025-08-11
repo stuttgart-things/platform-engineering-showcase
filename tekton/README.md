@@ -50,6 +50,13 @@ kubectl apply -f resources/namespace.yaml
 kubectl apply -f resources/rbac.yaml
 ```
 
+## CREATE SERVICE ACCOUNT
+
+```bash
+# CREATE SERVICE ACCOUNT
+kubectl apply -f resources/service-account.yaml
+```
+
 ## CREATE TEKTON PIPELINE-RESOURCES
 
 ```bash
