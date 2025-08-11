@@ -9,6 +9,24 @@ Key Features
 - ⚡ Automatically triggers CI/CD pipelines on push events in Gitea repositories
 - 🔍 Includes manual testing methods for both pipeline execution and webhook triggering
 
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Gitea as Gitea Repo
+    participant EL as Tekton EventListener
+    participant TB as TriggerBinding
+    participant TT as TriggerTemplate
+    participant TP as Tekton Pipeline
+
+    Dev->>Gitea: Commit/Push code
+    Gitea-->>EL: Send webhook (HTTP POST)
+    EL->>TB: Match event payload to params
+    TB->>TT: Pass parameters to create PipelineRun
+    TT->>TP: Instantiate PipelineRun
+    TP->>TP: Run Tasks (lint, build, deploy)
+    TP-->>Dev: Pipeline results (logs, status)
+```
+
 ## DEPLOY TEKTON + GITEA
 
 ```bash
