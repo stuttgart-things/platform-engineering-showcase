@@ -1,4 +1,4 @@
-# GITEA + TEKTON-PIPELINES
+# TRIGGER TEKTON-PIPELINES FROM TEKTON
 
 This showcase demonstrates how to set up Gitea (self-hosted Git service) integrated with Tekton Pipelines in Kubernetes to enable push-to-build workflows.
 
