@@ -1,0 +1,28 @@
+# SET TETKON-PIPELINE STATUS ON GITEA COMMIT
+
+## DEPLOY
+
+```bash
+# GITEA
+
+# TEKTON-PIPELINES
+
+# TEKTON-DASHBOARD
+
+# TEKTON-RESULTS
+
+```
+
+## CONFIGURE GITEA
+
+```bash
+
+```
+
+
+## RUN-PIPELINE
+
+```bash
+
+
+```
