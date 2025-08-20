@@ -1,0 +1,30 @@
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: keycloak-cluster
+networking:
+  disableDefaultCNI: false
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.33.2
+  - role: worker
+    image: kindest/node:v1.33.2
+    extraPortMappings:
+      - containerPort: 31633 # Grafana
+        hostPort: 31633
+      - containerPort: 31634 # Keycloak
+        hostPort: 31634
+      - containerPort: 31635 # Gitea
+        hostPort: 31635
+    extraMounts:
+      - hostPath: /mnt/keycloak-cluster1  # Host directory to mount
+        containerPath: /data              # Mount path inside the KinD node
+  - role: worker
+    image: kindest/node:v1.33.2
+    extraMounts:
+      - hostPath: /mnt/keycloak-cluster2  # Host directory to mount
+        containerPath: /data              # Mount path inside the KinD node
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://registry-1.docker.io"]

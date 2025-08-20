@@ -1,0 +1,39 @@
+---
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: test-pr6
+  namespace: tekton-ci
+spec:
+  pipelineRef:
+    name: git-clone-and-set-status
+  workspaces:
+    - name: source-repo
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 1Gi
+    # Optional credential workspaces (uncomment if needed)
+    # - name: ssh-credentials
+    #   secret:
+    #     secretName: ssh-key-secret
+    # - name: basic-auth
+    #   secret:
+    #     secretName: basic-auth-secret
+    # - name: ssl-ca
+    #   secret:
+    #     secretName: ssl-ca-secret
+
+  params:
+    - name: repository-url
+      value: "https://github.com/stuttgart-things/helm.git"
+    - name: revision
+      value: "main"
+    - name: gitea-host
+      value: "http://maverick.tiab.labda.sva.de:30083"  # Gitea server address with port
+    - name: repo-full-name
+      value: "gitea_admin/source"      # Must match repository path
+    - name: status-description
+      value: "Pipeline started"

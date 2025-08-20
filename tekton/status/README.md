@@ -52,8 +52,9 @@ task start gitea-set-status \
 -p COMMIT_SHA=80b8528fcea3c0ca416732c455b6dd30f9da49d4 \
 -p STATE=success \
 -p DESCRIPTION="Build & Deploy Successful" \
--p TARGET_URL="http://maverick.tiab.labda.sva.de:31445/#/namespaces/tekton-ci/pipelineruns/my-build-run" \
+-p DASHBOARD_URL="http://maverick.tiab.labda.sva.de:31445" \
 -p CONTEXT="continuous-integration/tekton" \
 -p API_PATH_PREFIX="/api/v1" \
 -p GITEA_TOKEN_SECRET_NAME=gitea \
 -p GITEA_TOKEN_SECRET_KEY=token
+```

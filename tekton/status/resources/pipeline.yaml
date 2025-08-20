@@ -1,0 +1,65 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: git-clone-and-set-status
+  namespace: tekton-ci
+spec:
+  workspaces:
+    - name: source-repo
+    - name: ssh-credentials
+      optional: true
+    - name: basic-auth
+      optional: true
+    - name: ssl-ca
+      optional: true
+  params:
+    # Git parameters
+    - name: repository-url
+      type: string
+    - name: revision
+      type: string
+      default: "main"
+    # Gitea status parameters
+    - name: gitea-host
+      type: string
+    - name: repo-full-name
+      type: string
+    - name: status-description
+      type: string
+      default: "Tekton pipeline status"
+  tasks:
+    # Task 1: Clone the repository
+    - name: fetch-source
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source-repo
+        - name: ssh-directory
+          workspace: ssh-credentials
+        - name: basic-auth
+          workspace: basic-auth
+        - name: ssl-ca-directory
+          workspace: ssl-ca
+      params:
+        - name: url
+          value: "$(params.repository-url)"
+        - name: revision
+          value: "$(params.revision)"
+    # Task 2: Set commit status in Gitea
+    - name: update-gitea-status
+      taskRef:
+        name: gitea-set-status
+      runAfter: ["fetch-source"]
+      params:
+        - name: GITEA_HOST
+          value: "$(params.gitea-host)"
+        - name: REPO_FULL_NAME
+          value: "$(params.repo-full-name)"
+        - name: COMMIT_SHA
+          value: "$(tasks.fetch-source.results.commit)"  # Using commit SHA from git-clone
+        - name: DESCRIPTION
+          value: "$(params.status-description)"
+        - name: STATE
+          value: "pending"  # Initial state

@@ -1,0 +1,30 @@
+{
+  "keycloak_client_id": "admin-cli",
+  "keycloak_username": "<REPLACE>",
+  "keycloak_password": "<REPLACE>",
+  "keycloak_url": "http://localhost:31634",
+  "keycloak_realm": "master",
+  "realm_name": "apps",
+  "realm_groups": ["apps-admin"],
+  "users": [
+    {
+      "username": "jane",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "email": "jane.doe@example.com",
+      "initial_password": {
+        "value": "<REPLACE>",
+        "temporary": false
+      },
+      "groups": ["apps-admin"]
+    },
+    {
+      "username": "admin",
+      "initial_password": {
+        "value": "<REPLACE>",
+        "temporary": false
+      },
+      "groups": ["apps-admin"]
+    }
+  ]
+}
