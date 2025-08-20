@@ -9,7 +9,7 @@ helmfiles:
       - openebs_local_lvm_enabled: false
       - openebs_local_zfs_enabled: false
       - openebs_replicated_mayastor_enabled: false
-  - path: git::https://github.com/stuttgart-things/helm.git@databases/keycloak.yaml.gotmpl
+  - path: git::https://github.com/stuttgart-things/helm.git@database/keycloak.yaml.gotmpl
     values:
       - version: 25.1.0
       - enableIngress: false

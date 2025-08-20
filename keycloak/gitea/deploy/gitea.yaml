@@ -12,7 +12,7 @@ helmfiles:
       - enableOauth: true
       - oauthName: keycloak
       - oauthProvider: "openidConnect"
-      - oauthKey: gitea
+      - oauthKey: gitea # pragma: allowlist secret
       - oauthSecret: {{ env "GITEA_CLIENT_SECRET" }}
       - oauthAutoDiscoverUrl: "http://{{ env "KIND_HOST" }}:31634/realms/apps/.well-known/openid-configuration"
       - oauthScopes: "openid, profile, email"

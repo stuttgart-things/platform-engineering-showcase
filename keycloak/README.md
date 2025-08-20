@@ -1,6 +1,8 @@
 # KEYCLOAK
 
-## CREATE KEYCLOAK-CLUSTER
+## KEYCLOAK BASE SETUP
+
+<details><summary>CREATE KEYCLOAK-CLUSTER</summary>
 
 ```bash
 KUBECONFIG_PATH=~/.kube/kind-keycloak
@@ -15,102 +17,192 @@ export KUBECONFIG=${KUBECONFIG_PATH}
 kubectl get nodes
 ```
 
-## DELOY KEYCLOAK
+</details>
+
+<details><summary>DELOY KEYCLOAK</summary>
 
 ```bash
-export KEYCLOAK_ADMIN_PASSWORD="REPLACE-ME" # pragma: allowlist secret
+export KEYCLOAK_ADMIN_PASSWORD=$(gum input --placeholder="Enter keycloak password") # pragma: allowlist secret
+echo $KEYCLOAK_ADMIN_PASSWORD # pragma: allowlist secret
+
+#export HELMFILE_CACHE_HOME=/tmp/helm-cache-keycloak
 helmfile apply -f keycloak.yaml
+
+kubectl wait --for=condition=ready pod --all -n keycloak --timeout=300s
 ```
 
-## EXECUTE BASE KEYCLOAK-SETUP
+</details>
+
+<details><summary>EXECUTE BASE KEYCLOAK-SETUP</summary>
 
 ```bash
 cd base
 
+INITIAL_PASSWORD=$(date +%s | sha256sum | base64 | head -c 15)
+echo ${INITIAL_PASSWORD}
+
+# EXAMPLE FILE - COULD BE CHANGED
+cat <<EOF > ./terraform.tfvars.json
+{
+  "realm_groups": ["apps-admin"],
+  "users": [
+    {
+      "username": "carlo",
+      "first_name": "Carlo",
+      "last_name": "Coxx",
+      "email": "carlo.coxx@example.com",
+      "initial_password": {
+        "value": "${INITIAL_PASSWORD}$",
+        "temporary": false
+      },
+      "groups": ["apps-admin"]
+    },
+    {
+      "username": "admin",
+      "initial_password": {
+        "value": "${INITIAL_PASSWORD}$",
+        "temporary": false
+      },
+      "groups": ["apps-admin"]
+    }
+  ]
+}
+EOF
+
 export TF_VAR_keycloak_client_id="admin-cli"
 export TF_VAR_keycloak_username="admin"
-export TF_VAR_keycloak_password="<REPLACE-ME>"
+export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD} # SET/FROM KEYCLOAK DEPLOYMENT STEP
 export TF_VAR_keycloak_url="http://localhost:31634"
 export TF_VAR_keycloak_realm="master"
 export TF_VAR_realm_name="apps"
 
 terraform init --upgrade
-terraform apply
+terraform apply --auto-approve
 
 cd -
 ```
 
-## OPTION: CONFIGURE KEYCLOAK FOR GRAFANA
+</details>
+
+## OPTION: GRAFANA
+
+<details><summary>CONFIGURE KEYCLOAK FOR GRAFANA</summary>
 
 ```bash
 cd grafana/config
 
 export TF_VAR_keycloak_client_id="admin-cli"
 export TF_VAR_keycloak_username="admin"
-export TF_VAR_keycloak_password="<REPLACE-ME>"
+export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD} # SET/FROM KEYCLOAK DEPLOYMENT STEP
 export TF_VAR_keycloak_url="http://localhost:31634"
 export TF_VAR_keycloak_realm="master"
 export TF_VAR_realm_name="apps"
 export TF_VAR_grafana_url="http://$(hostname -f):31633"
 
 terraform init --upgrade
-terraform apply
-terraform output --json
+terraform apply --auto-approve
 
-# OPTIONAL OUTPUT: LOGOUT ADDRESS (FOR TESTING)
-echo http://$(hostname -f):31634/realms/apps/protocol/openid-connect/logout?redirect_uri=http:/$(hostname -f):31635/
+export GRAFANA_CLIENT_SECRET=$(terraform output --json | jq -r '.grafana_client_secret.value')
+echo ${GRAFANA_CLIENT_SECRET}
 
+echo Check Keycloak: http://$(hostname -f):31634
 
 cd -
 ```
 
-## OPTION: DEPLOY GRAFANA
+</details>
+
+<details><summary>DEPLOY GRAFANA</summary>
 
 ```bash
+# DEPLOY
 export KIND_HOST=$(hostname -f)
 helmfile apply -f grafana/deploy/grafana.yaml
 
-kubectl -n grafana edit cm grafana-deployment
-# ADD
-#data:
-#  grafana.ini: |
-#  [auth.generic_oauth]
-#  client_secret = <GET-FROM-TERRAFORM-OUTPUT>
+# ADD CLIENT SECRET
+kubectl -n grafana patch cm grafana-deployment \
+  --type merge \
+  -p "$(kubectl -n grafana get cm grafana-deployment -o json \
+    | jq ".data[\"grafana.ini\"] |= ( sub(\"client_id = grafana\"; \"client_id = grafana\nclient_secret = ${GRAFANA_CLIENT_SECRET}\") )")"
 
+kubectl -n grafana get cm grafana-deployment -n grafana -o yaml
+
+# RESTART
 kubectl delete po --all -n grafana
+
+echo Check Grafana: http://$(hostname -f):31633
+
+# OPTIONAL OUTPUT: LOGOUT ADDRESS (FOR TESTING)
+echo http://$(hostname -f):31634/realms/apps/protocol/openid-connect/logout?redirect_uri=http:/$(hostname -f):31633/
+
+cd -
 ```
 
-## OPTION: CONFIGURE KEYCLOAK FOR GITEA
+</details>
+
+## OPTION: GITEA
+
+<details><summary>CONFIGURE KEYCLOAK FOR GITEA</summary>
 
 ```bash
 cd gitea/config
 
 export TF_VAR_keycloak_client_id="admin-cli"
 export TF_VAR_keycloak_username="admin"
-export TF_VAR_keycloak_password="<REPLACE-ME>"
+export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD} # SET/FROM KEYCLOAK DEPLOYMENT STEP
 export TF_VAR_keycloak_url="http://localhost:31634"
 export TF_VAR_keycloak_realm="master"
 export TF_VAR_realm_name="apps"
 export TF_VAR_gitea_url="http://$(hostname -f):31635"
 
 terraform init --upgrade
-terraform apply
-terraform output --json
+terraform apply --auto-approve
 
 export GITEA_CLIENT_SECRET=$(terraform output --json | jq -r '.gitea_client_secret.value')
+echo ${GITEA_CLIENT_SECRET}
 
 cd -
 ```
 
-## OPTION: DEPLOY GITEA
+</details>
+
+<details><summary>DEPLOY GITEA</summary>
 
 ```bash
 export KIND_HOST=$(hostname -f)
 helmfile apply -f gitea/deploy/gitea.yaml
+
+echo Check Gitea: http://$(hostname -f):31635
+
+echo http://$(hostname -f):31634/realms/apps/protocol/openid-connect/logout?redirect_uri=http:/$(hostname -f):31635/
 ```
 
+</details>
+
 ## CLEAN-UP
+
+<details><summary>DELETE CLUSTER</summary>
 
 ```bash
 kind delete clusters keycloak-cluster
 ```
+
+</details>
+
+<details><summary>REMOVE TERRAFORM STATE FILES</summary>
+
+```bash
+# BASE
+rm -rf base/.terraform*
+rm -rf base/terraform*
+
+# GRAFANA
+rm -rf grafana/config/.terraform*
+rm -rf grafana/config/terraform*
+
+# GITEA
+rm -rf gitea/config/.terraform*
+rm -rf gitea/config/terraform*
+```
+
+</details>
