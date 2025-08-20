@@ -1,0 +1,25 @@
+---
+helmfiles:
+  - path: /home/sthings/projects/apps/helm/monitoring/grafana.yaml.gotmpl
+    values:
+      - ingressEnabled: false
+      - serviceType: NodePort
+      - nodePortHttp: "31633"
+      - storageClassName: standard
+      - size: 1 # storage size in Gi
+      - grafanaConfig: |
+          server:
+            protocol: http
+            root_url: http://{{ env "KIND_HOST" }}:31633
+            serve_from_sub_path: false
+          auth.generic_oauth:
+            enabled: true
+            name: Keycloak
+            allow_sign_up: true
+            client_id: grafana
+            scopes: openid profile email
+            auth_url: http://{{ env "KIND_HOST" }}:31634/realms/apps/protocol/openid-connect/auth
+            token_url: http://{{ env "KIND_HOST" }}:31634/realms/apps/protocol/openid-connect/token
+            api_url: http://{{ env "KIND_HOST" }}:31634/realms/apps/protocol/openid-connect/userinfo
+            role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || 'Viewer'
+            tls_skip_verify_insecure: true

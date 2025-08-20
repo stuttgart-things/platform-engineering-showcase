@@ -1,0 +1,102 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitea-set-status
+  labels:
+    app.kubernetes.io/version: "1.1"
+  annotations:
+    tekton.dev/categories: Git
+    tekton.dev/displayName: "Set Gitea commit status"
+spec:
+  description: >-
+    Set the commit status in a Gitea repository using its REST API.
+    Supports states: error, failure, pending, warning, success.
+    Includes a description, context, and a target URL (e.g., Tekton dashboard).
+  params:
+    - name: GITEA_PROTOCOL
+      description: "http or https"
+      default: "https"
+    - name: GITEA_HOST
+      description: "The Gitea host (e.g., gitea.example.com:3000)"
+    - name: API_PATH_PREFIX
+      description: "API path prefix"
+      default: "/api/v1"
+    - name: REPO_FULL_NAME
+      description: "The repository in owner/repo format (e.g., user/myrepo)"
+    - name: COMMIT_SHA
+      description: "The commit SHA to set the status for"
+    - name: STATE
+      description: "One of: error, failure, pending, warning, success"
+    - name: DESCRIPTION
+      description: "Short description of the status"
+    - name: CONTEXT
+      description: "Label to differentiate this status from others"
+      default: "continuous-integration/tekton"
+    - name: DASHBOARD_URL
+      description: "Tekton Dashboard"
+      default: ""
+    - name: GITEA_TOKEN_SECRET_NAME
+      description: "Kubernetes secret name containing the Gitea API token"
+      default: gitea
+    - name: GITEA_TOKEN_SECRET_KEY
+      description: "Secret key containing the Gitea API token"
+      default: token
+  volumes:
+    - name: gitea-token
+      secret:
+        secretName: $(params.GITEA_TOKEN_SECRET_NAME)
+  steps:
+    - name: set-status
+      image: badouralix/curl-jq:alpine
+      volumeMounts:
+        - name: gitea-token
+          mountPath: /etc/gitea
+      script: |
+        #!/bin/sh
+        set -eu
+
+        printenv
+
+        TOKEN="$(cat /etc/gitea/$(params.GITEA_TOKEN_SECRET_KEY))"
+        API_URL="$(params.GITEA_PROTOCOL)://$(params.GITEA_HOST)$(params.API_PATH_PREFIX)/repos/$(params.REPO_FULL_NAME)/statuses/$(params.COMMIT_SHA)"
+
+        TASKRUN_NAME="$(context.taskRun.name)"
+        NAMESPACE="$(context.taskRun.namespace)"
+
+        # Fixed context variable name (case-sensitive)
+        if [ -n "$(context.pipelineRun.name)" ]; then
+          PIPELINERUN_NAME="$(context.pipelineRun.name)"
+          TARGET_URL="$(params.DASHBOARD_URL)/#/namespaces/$NAMESPACE/pipelineruns/$PIPELINERUN_NAME"
+        else
+          TASKRUN_NAME="$(context.taskRun.name)"
+          TARGET_URL="$(params.DASHBOARD_URL)/#/namespaces/$NAMESPACE/taskruns/$TASKRUN_NAME"
+        fi
+
+        echo "[INFO] Setting commit status on $API_URL"
+        echo "[INFO] State: $(params.STATE)"
+        echo "[INFO] Description: $(params.DESCRIPTION)"
+        echo "[INFO] Context: $(params.CONTEXT)"
+        echo "[INFO] Target URL: $TARGET_URL"
+
+        STATUS_JSON=$(jq -n \
+          --arg state "$(params.STATE)" \
+          --arg target_url "$TARGET_URL" \
+          --arg description "$(params.DESCRIPTION)" \
+          --arg context "$(params.CONTEXT)" \
+          '{state: $state, target_url: $target_url, description: $description, context: $context}')
+
+        HTTP_CODE=$(curl -s -o /tmp/resp.txt -w "%{http_code}" \
+          -X POST "$API_URL" \
+          -H "Authorization: token $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$STATUS_JSON")
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "[INFO] Gitea status successfully set."
+        else
+          echo "[ERROR] Failed to set status. HTTP $HTTP_CODE"
+          echo "[ERROR] Response:"
+          cat /tmp/resp.txt
+          exit 1
+        fi

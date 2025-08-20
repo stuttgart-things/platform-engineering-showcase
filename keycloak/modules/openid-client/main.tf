@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    keycloak = {
-      source  = "keycloak/keycloak"
-      version = ">= 5.0.0"
-    }
-  }
-}
-
 resource "keycloak_openid_client" "this" {
   realm_id                     = var.realm_id
   client_id                    = var.client_id

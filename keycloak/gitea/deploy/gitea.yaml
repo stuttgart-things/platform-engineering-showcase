@@ -1,0 +1,24 @@
+---
+helmfiles:
+  - path: /home/sthings/projects/apps/helm/apps/gitea.yaml.gotmpl
+    values:
+      - namespace: gitea
+      - version: 12.1.3
+      - httpServiceType: NodePort
+      - nodePortHttp: "31635"
+      - webhookAllowList: "*"
+      - adminUser: gitea_admin
+      - adminPassword: {{ env "GITEA_ADMIN_PASSWORD" | default "admin" }}
+      - enableOauth: true
+      - oauthName: keycloak
+      - oauthProvider: "openidConnect"
+      - oauthKey: gitea
+      - oauthSecret: {{ env "GITEA_CLIENT_SECRET" }}
+      - oauthAutoDiscoverUrl: "http://{{ env "KIND_HOST" }}:31634/realms/apps/.well-known/openid-configuration"
+      - oauthScopes: "openid, profile, email"
+      - oauthGroupClaimName: "groups"
+      - oauthAdminGroup: "apps-admin"
+      - oauthEnableAutoRegistration: true
+      - oauthAccountLinking: auto
+      - rootUrl: http://{{ env "KIND_HOST" }}:31635/
+      - serverDomain: {{ env "KIND_HOST" }}
