@@ -1,5 +1,20 @@
 # SET TETKON-PIPELINE STATUS ON GITEA COMMIT
 
+## TEST STATUS API
+
+```bash
+curl -X POST \
+  "https://gitea.example.come/api/v1/repos/skywalker//baseapp-sdk/statuses/1eea9ebeddde9… \
+  -H "Authorization: token 2b2b5ed6005276e4afcd0d833edce4b9ce4dbdc7" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": "success",
+    "target_url": "https://gitea.example.come",
+    "description": "Build succeeded",
+    "context": "continuous-integration/manual"
+  }'
+```
+
 ## DEPLOY TEKTON + GITEA
 
 ```bash
@@ -39,6 +54,13 @@ spec:
       targetPort: 9097
       nodePort: 31445
 EOF
+```
+
+## CREATE TOKEN
+
+```bash
+kubectl create secret generic gitea \
+  --from-literal=token=<REPLACE-ME>
 ```
 
 ## START TASKRUN (TESTING)
