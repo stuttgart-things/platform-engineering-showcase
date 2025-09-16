@@ -1,0 +1,54 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: apk-mirror-pvc
+spec:
+  storageClassName: nfs4-csi
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 900Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apk-mirror
+  labels:
+    app: apk-mirror
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apk-mirror
+  template:
+    metadata:
+      labels:
+        app: apk-mirror
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.28.0-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: apk-data
+              mountPath: /usr/share/nginx/html/apk
+      volumes:
+        - name: apk-data
+          persistentVolumeClaim:
+            claimName: apk-mirror-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apk-mirror
+spec:
+  type: NodePort
+  selector:
+    app: apk-mirror
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

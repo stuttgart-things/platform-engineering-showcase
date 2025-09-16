@@ -1,0 +1,7 @@
+---
+# This file is part of the platform-engineering-showcase project.
+# It is used to deploy Gitea and Tekton Pipelines on a Kubernetes cluster.
+helmfiles:
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/tekton.yaml.gotmpl
+    values:
+      - namespace: tekton-pipelines
