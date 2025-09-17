@@ -1,5 +1,5 @@
 requests
-savepagenow==1.1.1
+savepagenow==1.3.0
 dotenv
 PyYAML
 eml_parser
