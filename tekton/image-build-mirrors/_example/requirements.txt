@@ -1,0 +1,15 @@
+requests
+savepagenow==1.1.1
+dotenv
+PyYAML
+eml_parser
+pytz
+pandas
+tabulate
+tqdm
+beautifulsoup4
+minio>=7.1.0
+SQLAlchemy
+psycopg2-binary
+urllib3
+python-dotenv
