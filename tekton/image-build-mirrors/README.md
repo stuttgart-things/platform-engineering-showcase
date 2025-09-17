@@ -2,6 +2,14 @@
 
 ## EXPORT (INTERNET FACING)
 
+<details><summary>ANALYZE PROJECT STRCUTURE</summary>
+
+```bash
+sh scripts/analyze-project-dir.sh --dir _example
+```
+
+</details>
+
 <details><summary>EXPORT CONTAINER-IMAGES</summary>
 
 ```bash
