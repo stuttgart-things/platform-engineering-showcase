@@ -1,5 +1,33 @@
-dagger call -m github.com/stuttgart-things/dagger/kyverno@v0.31.2 validate --policy /home/sthings/projects/bosch/platform-engineering-showcase/kyverno/policies --resource /home/sthings/projects/bosch/platform-engineering-showcase/crossplane/postgres-db/backstage/resources -vv --progress plain
+# stuttgart-things/platform-engineering-showcase/kyverno
 
+## DEPLOYMENT
 
+<details><summary>DEPLOY w/ HELMFILE</summary>
 
-dagger -m github.com/valorl/daggerverse/git-files-changed@e8b25b9c6589f13b362dcaf94acda967f26f6700   call files   --source .   --head-ref HEAD   --base-ref origin/main
+```bash
+helmfile apply -f deployment/kyverno.yaml
+```
+
+</details>
+
+## USECASE ADD SECRET TO DEPLOYMENT
+
+<details><summary>CREATE REQUIREMENTS</summary>
+
+```bash
+kubectl apply -f policies/deployment-secret-usecase/ns-sa-secret.yaml
+```
+
+</details>
+
+<details><summary>TEST w/ DEPLOYMENT EXAMPLE</summary>
+
+```bash
+# APPLY POLICY
+kubectl apply -f policies/deployment-secret-usecase/policy.yaml
+
+# APPLY DEPLOYMENT EXAMPLE
+kubectl apply -f policies/deployment-secret-usecase/deployment.yaml
+```
+
+</details>

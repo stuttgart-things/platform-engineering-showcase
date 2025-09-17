@@ -10,6 +10,28 @@ sh scripts/analyze-project-dir.sh --dir _example
 
 </details>
 
+<details><summary>ANALYZE HELM CHART</summary>
+
+```bash
+helm repo add kyverno https://kyverno.github.io/kyverno/
+
+sh scripts/analyze-helm-chart.sh \
+--name kyverno \
+--charturl kyverno/kyverno \
+--version 3.5.1
+```
+
+</details>
+
+<details><summary>DOWLOAD HELM CHART</summary>
+
+```bash
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm pull kyverno/kyverno --version 3.5.1
+```
+
+</details>
+
 <details><summary>EXPORT CONTAINER-IMAGES</summary>
 
 ```bash

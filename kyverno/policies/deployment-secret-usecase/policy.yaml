@@ -1,0 +1,27 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: inject-bibi-secret-env
+spec:
+  rules:
+    - name: add-bibi-secret-env
+      match:
+        resources:
+          kinds:
+            - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.serviceAccountName || '' }}"
+            operator: Equals
+            value: "bibi-sa"
+      mutate:
+        foreach:
+          - list: "request.object.spec.containers"
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - name: "{{ element.name }}"
+                    envFrom:
+                      - secretRef:
+                          name: bibi
