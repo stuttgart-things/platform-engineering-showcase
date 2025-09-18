@@ -42,6 +42,9 @@ spec:
     - name: GITEA_TOKEN_SECRET_KEY
       description: "Secret key containing the Gitea API token"
       default: token
+    - name: PIPELINERUN_NAME
+      description: "PipelineRun name"
+      default: TASKRUN
   volumes:
     - name: gitea-token
       secret:
@@ -56,8 +59,6 @@ spec:
         #!/bin/sh
         set -eu
 
-        printenv
-
         TOKEN="$(cat /etc/gitea/$(params.GITEA_TOKEN_SECRET_KEY))"
         API_URL="$(params.GITEA_PROTOCOL)://$(params.GITEA_HOST)$(params.API_PATH_PREFIX)/repos/$(params.REPO_FULL_NAME)/statuses/$(params.COMMIT_SHA)"
 
@@ -65,8 +66,8 @@ spec:
         NAMESPACE="$(context.taskRun.namespace)"
 
         # Fixed context variable name (case-sensitive)
-        if [ -n "$(context.pipelineRun.name)" ]; then
-          PIPELINERUN_NAME="$(context.pipelineRun.name)"
+        if [ -n "$(params.PIPELINERUN_NAME)" ] && [ "$(params.PIPELINERUN_NAME)" != "TASKRUN" ]; then
+          PIPELINERUN_NAME="$(params.PIPELINERUN_NAME)"
           TARGET_URL="$(params.DASHBOARD_URL)/#/namespaces/$NAMESPACE/pipelineruns/$PIPELINERUN_NAME"
         else
           TASKRUN_NAME="$(context.taskRun.name)"
@@ -78,6 +79,7 @@ spec:
         echo "[INFO] Description: $(params.DESCRIPTION)"
         echo "[INFO] Context: $(params.CONTEXT)"
         echo "[INFO] Target URL: $TARGET_URL"
+        echo "[INFO] Using COMMIT_SHA name: $(params.COMMIT_SHA)"
 
         STATUS_JSON=$(jq -n \
           --arg state "$(params.STATE)" \

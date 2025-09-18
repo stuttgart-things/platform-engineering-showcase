@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: test-pr6
+  name: test-pr7
   namespace: tekton-ci
 spec:
   pipelineRef:
@@ -15,17 +15,6 @@ spec:
           resources:
             requests:
               storage: 1Gi
-    # Optional credential workspaces (uncomment if needed)
-    # - name: ssh-credentials
-    #   secret:
-    #     secretName: ssh-key-secret
-    # - name: basic-auth
-    #   secret:
-    #     secretName: basic-auth-secret
-    # - name: ssl-ca
-    #   secret:
-    #     secretName: ssl-ca-secret
-
   params:
     - name: repository-url
       value: "https://github.com/stuttgart-things/helm.git"
