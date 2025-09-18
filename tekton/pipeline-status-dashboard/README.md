@@ -73,28 +73,41 @@ echo http://$(hostname -f):31445
 
 </details>
 
-<details><summary>OPTIONAL: TEST GITEA STATUS API w/ CURL</summary>
+<details><summary>CREATE + TEST GITEA TOKEN (ON CLUSTER)</summary>
+
+### CREATE TOKEN ON GITEA GUI
+
+* Log into Gitea and click your avatar to open the user menu, then select Settings.
+* From the Settings menu, select Applications.
+* In the Manage Access Tokens section, enter a name for the token.
+* Set the token permission for repository to Read and Write. The rest of the token permissions can be set as Read.
+* After the token permissions are set, click the Generate Token button.
+* When the new token is generated, copy it, you will need it to configure the integration in YouTrack.
+
+### CREATE TOKEN ON CLUSTER
 
 ```bash
+GITEA_TOKEN=<REPLACE-ME>
+
+kubectl -n tekton-ci create secret generic gitea \
+  --from-literal=token=${GITEA_TOKEN}
+```
+
+### OPTIONAL: TEST GITEA STATUS API w/ CURL
+
+```bash
+GITEA_TOKEN=<REPLACE-ME>
+
 curl -X POST \
-  "https://$(hostname -f):30083/api/v1/repos/skywalker//baseapp-sdk/statuses/1eea9ebeddde9… \
-  -H "Authorization: token 2b2b5ed6005276e4afcd0d833edce4b9ce4dbdc7" \
+  "http://$(hostname -f):30083/api/v1/repos/gitea_admin/source/statuses/80b8528fcea3c0ca416732c455b6dd30f9da49d4" \
+  -H "Authorization: token ${GITEA_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
     "state": "success",
-    "target_url": "https://gitea.example.come",
+    "target_url": "http://$(hostname -f):30083",
     "description": "Build succeeded",
     "context": "continuous-integration/manual"
   }'
-```
-
-</details>
-
-<details><summary>CREATE GITEA TOKEN ON CLUSTER</summary>
-
-```bash
-kubectl create secret generic gitea \
-  --from-literal=token=<REPLACE-ME>
 ```
 
 </details>
@@ -131,7 +144,7 @@ task start gitea-set-status \
 
 </details>
 
-<details><summary>CREARE PIPELINERUN</summary>
+<details><summary>CREATE PIPELINERUN</summary>
 
 ```bash
 PR_NAME=set-gitea-commit-status-$(date +%s%N | sha256sum | head -c 16)
