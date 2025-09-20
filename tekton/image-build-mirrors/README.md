@@ -10,6 +10,14 @@ sh scripts/analyze-project-dir.sh --dir _example
 
 </details>
 
+<details><summary>ANALYZE IMAGES FROM K8S NAMESPACE</summary>
+
+```bash
+sh scripts/analyze-images-namespace.sh --namespace tekton-operator
+```
+
+</details>
+
 <details><summary>ANALYZE HELM CHART</summary>
 
 ```bash
