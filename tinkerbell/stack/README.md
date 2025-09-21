@@ -23,13 +23,26 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 ### INSTALL TASK
 
 ```bash
-brew install go-task/tap/go-task gum
-brew install kubectl helm k9s
+brew install go-task/tap/go-task gum kubectl helm k9s
 ```
 
 </details>
 
 <details><summary>INSTALL K3S CLUSTER</summary>
+
+### PARTITION DISK
+
+```bash
+sudo lvextend -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv
+sudo resize2fs /dev/mapper/ubuntu--vg-ubuntu--lv
+```
+
+### INSTALL
+
+```bash
+export TASK_X_REMOTE_TASKFILES=1
+task --taskfile https://raw.githubusercontent.com/stuttgart-things/docs/c7a842d8bf817209868fe253d98b4f927890a600/tasks/k3s.yaml install
+```
 
 </details>
 
@@ -306,10 +319,20 @@ EOF
 
 </details>
 
-### VERIFY
+<details><summary>VERIFY</summary>
+
+### TEST IMAGE AVAILABILITY
+
+```bash
+wget --spider http://192.168.56.117:7173/jammy-server-cloudimg-amd64.raw.gz
+```
+
+### WORKFLOW STATE
 
 ```bash
 Every 2.0s: kubectl get workflow -A                                                   
 NAMESPACE   NAME                    TEMPLATE   STATE     ACTION          AGENT               HARDWARE
 default     u22-machine1-workflow   ubuntu22   SUCCESS   kexec into os   00:0c:29:aa:bb:cc   machine1
 ```
+
+</details>
