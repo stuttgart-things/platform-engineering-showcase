@@ -112,16 +112,6 @@ grep -E 'interface|bind' /etc/dnsmasq.conf
 sudo tcpdump -i ens34 port 67 or port 68 -n
 ``` 
 
-# PXE CLIENT (MACHINE1)
-
-### VMWARE CONFIG
-
-* 1CPU 1CORES
-* 4GB RAM
-* 20GB HDD
-* NETWORK1: VMnet0
-* NO DISK (WILL INSTALL OPERATING SYSTEM LATER)
-
 # GATEWAY/ROUTER CONFIG
 
 * VM Configuration in VMware Workstation
@@ -253,4 +243,25 @@ On the client VM (with gateway 192.168.56.2):
 ping -c3 8.8.8.8        # raw internet
 ping -c3 google.com     # with DNS
 ```
+
+# PXE CLIENT (MACHINE1)
+
+### VMWARE CONFIG
+
+* 1CPU 1CORES
+* 4GB RAM
+* 20GB HDD
+* NETWORK1: VMnet0
+* NO DISK (WILL INSTALL OPERATING SYSTEM LATER)
+
+Prior starting the vm add the following line to the vmx file (e.g. machine1.vmx)
+
+```bash
+ethernet0.virtualDev = "e1000" # add this line 
+```
+
+(otherwise hookos will not know the network adapter from vmware workstation)
+
+  
+
 
