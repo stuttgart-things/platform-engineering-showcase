@@ -34,8 +34,12 @@ sh scripts/analyze-helm-chart.sh \
 <details><summary>DOWLOAD HELM CHART</summary>
 
 ```bash
+# OPTION1: CHART REPO
 helm repo add kyverno https://kyverno.github.io/kyverno/
 helm pull kyverno/kyverno --version 3.5.1
+
+# OPTION2: OCI-REPO
+helm pull oci://ghcr.io/stuttgart-things/tekton/tekton --version 0.77.0
 ```
 
 </details>
