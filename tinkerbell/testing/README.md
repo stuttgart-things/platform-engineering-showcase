@@ -1,17 +1,19 @@
 # platform-engineering-showcase/tinkerbell/testing
 
-# PXE SERVER VMWARE WORKSTATION (JUST TESTING PXE-SERVER)
+## PXE SERVER VMWARE WORKSTATION (JUST TESTING PXE-SERVER)
 
-## VMWARE NETWORKS
+### VMWARE NETWORKS
 
-* Create custom network VMnet0:
+```bash
+Create custom network VMnet0:
 Type: Custom
 Host Connection: - (not connected)
 DHCP: - (disabled)
 Subnet: 192.168.56.0/24
 Host-only selected ✅
+```
 
-## PXE SERVER (STACK)
+### PXE SERVER (STACK)
 
 ### VMWARE CONFIG
 
