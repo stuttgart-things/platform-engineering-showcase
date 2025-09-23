@@ -336,3 +336,29 @@ default     u22-machine1-workflow   ubuntu22   SUCCESS   kexec into os   00:0c:2
 ```
 
 </details>
+
+## VMWARE WORKSTATION TESTING ENVIRONMENT
+
+<details><summary>CREATE VMware Networks</summary>
+
+### 🌐 Custom Network: **VMnet0**
+- **Type:** Custom  
+- **Host Connection:** ❌ Not connected  
+- **DHCP:** ❌ Disabled  
+- **Subnet:** `192.168.56.0/24`  
+- **Mode:** ✅ Host-only  
+
+</details>
+
+<details><summary>📡 PXE Server (Stack)</summary>
+
+### ⚙️ VMware Config
+
+- 🖥 **CPU:** 2 × 4 cores  
+- 🧠 **Memory:** 4 GB RAM  
+- 💽 **Disk:** 20 GB HDD  
+- 🌍 **Network 1:** NAT  
+- 🌍 **Network 2:** VMnet0  
+- 📀 **Boot Media:** `U25.iso`  
+
+</details>
