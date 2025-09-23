@@ -330,7 +330,7 @@ wget --spider http://192.168.56.117:7173/jammy-server-cloudimg-amd64.raw.gz
 ### WORKFLOW STATE
 
 ```bash
-Every 2.0s: kubectl get workflow -A                                                   
+Every 2.0s: kubectl get workflow -A
 NAMESPACE   NAME                    TEMPLATE   STATE     ACTION          AGENT               HARDWARE
 default     u22-machine1-workflow   ubuntu22   SUCCESS   kexec into os   00:0c:29:aa:bb:cc   machine1
 ```

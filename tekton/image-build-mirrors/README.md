@@ -69,6 +69,8 @@ sh scripts/export-apk-packages.sh \
 
 </details>
 
+export OPENAI_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai/
+
 <details><summary>EXPORT PIP-PACKAGES</summary>
 
 ```bash

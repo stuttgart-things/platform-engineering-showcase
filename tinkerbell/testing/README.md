@@ -35,7 +35,7 @@ network:
     ens34:
       addresses:
       - "192.168.56.1/24"
-	  
+
 sudo netplan apply
 ip a
 ```
@@ -48,7 +48,7 @@ sudo apt install -y dnsmasq syslinux pxelinux syslinux-common
 dpkg -L pxelinux | grep pxelinux.0
 ```
 
-### CONFIGURE TFTPBOOT 
+### CONFIGURE TFTPBOOT
 
 ```bash
 sudo mkdir -p /var/lib/tftpboot
@@ -75,7 +75,7 @@ LABEL local
   LOCALBOOT 0
 ```
 
-### CONFIGURE DNSMASQ 
+### CONFIGURE DNSMASQ
 
 ```bash
 #/etc/dnsmasq.conf
@@ -110,7 +110,7 @@ tftp-root=/var/lib/tftpboot
 sudo systemctl restart dnsmasq
 grep -E 'interface|bind' /etc/dnsmasq.conf
 sudo tcpdump -i ens34 port 67 or port 68 -n
-``` 
+```
 
 # GATEWAY/ROUTER CONFIG
 
@@ -257,11 +257,7 @@ ping -c3 google.com     # with DNS
 Prior starting the vm add the following line to the vmx file (e.g. machine1.vmx)
 
 ```bash
-ethernet0.virtualDev = "e1000" # add this line 
+ethernet0.virtualDev = "e1000" # add this line
 ```
 
 (otherwise hookos will not know the network adapter from vmware workstation)
-
-  
-
-
