@@ -75,7 +75,7 @@ ethernet0.virtualDev = "e1000" # add this line
 
 </details>
 
-<details><summary>Alpine Router Setup</summary>
+<details><summary>ALPINE ROUTER SETUP</summary>
 
 1. Install Alpine
 
