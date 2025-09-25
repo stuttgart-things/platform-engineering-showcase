@@ -60,7 +60,94 @@ ethernet0.virtualDev = "e1000" # add this line
 
 </details>
 
+## OPTIONAL: CONFIGURE ROUTER VM
+
+<details><summary>🔌 OVERVIEW</summary>
+
+* VM Configuration in VMware Workstation
+	* VM: Alpine Router
+	* NIC1: NAT (WAN side, internet access)
+	* NIC2: Host-only (VMnet1) (LAN side, your other VMs connect here)
+
+* Other VMs (clients):
+    * Single NIC: Host-only (VMnet1)
+	* Gateway = Alpine router LAN IP (we’ll use 192.168.56.2)
+
+</details>
+
+<details><summary>Alpine Router Setup</summary>
+
+1. Install Alpine
+
+When asked during setup:
+* Use eth0 for NAT interface (DHCP).
+* Use eth1 for Host-only (we’ll configure static).
+
+2. Configure Networking
+
+Edit /etc/network/interfaces:
+
+```bash
+# /etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+# WAN (NAT)
+auto eth0
+iface eth0 inet dhcp
+
+# LAN (Host-only)
+auto eth1
+iface eth1 inet static
+    address 192.168.56.2
+    netmask 255.255.255.0
+```
+
+/etc/init.d/networking restart
+
+3. Enable IP Forwarding
+
+```bash
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+```
+
+4. Set Up NAT
+
+```bash
+apk add iptables
+
+# Masquerade traffic from LAN to WAN
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+# Allow LAN → WAN
+iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+
+# Allow established connections back
+iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+rc-update add iptables
+service iptables save
+```
+
+</details>
+
 ## DEPLOYMENT STACK/TINKERBELL-SERVER
+
+<details><summary>OPTIONAL IP CONFIG</summary>
+
+5. Configure Client VMs (on Host-only)
+
+```bash
+* Example client config:
+IP: 192.168.56.10/24
+Gateway: 192.168.56.2
+DNS: 8.8.8.8 (or same as host)
+```
+
+Now the client VM will reach the internet through the Alpine router 🎉
+
+</details>
 
 <details><summary>INSTALL REQUIREMENTS</summary>
 
