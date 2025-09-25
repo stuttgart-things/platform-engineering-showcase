@@ -1,5 +1,64 @@
 # platform-engineering-showcase/tinkerbell/stack
 
+## OPTIONAL: VMWARE WORKSTATION TESTING ENVIRONMENT
+
+<details><summary>CREATE VMware Networks</summary>
+
+### 🌐 Custom Network: **VMnet0**
+- **Type:** Custom  
+- **Host Connection:** ❌ Not connected  
+- **DHCP:** ❌ Disabled  
+- **Subnet:** `192.168.56.0/24`  
+- **Mode:** ✅ Host-only  
+
+</details>
+
+<details><summary>📡 VM0: GATEWAY ROUTER</summary>
+
+### ⚙️ VMware Config
+
+- 🖥 **CPU:** 1 × 2 cores  
+- 🧠 **Memory:** 2 GB RAM  
+- 💽 **Disk:** 10 GB HDD  
+- 🌍 **Network 1:** NAT (WAN side, internet access)
+- 🌍 **Network 2:** Host-only (VMnet1) (LAN side, your other VMs connect here)
+- 📀 **Boot Media:** `Alpine.iso`  
+
+</details>
+
+<details><summary>📡 VM1: PXE Server (Stack)</summary>
+
+### ⚙️ VMware Config
+
+- 🖥 **CPU:** 2 × 4 cores  
+- 🧠 **Memory:** 4 GB RAM  
+- 💽 **Disk:** 20 GB HDD  
+- 🌍 **Network 1:** NAT  
+- 🌍 **Network 2:** VMnet0  
+- 📀 **Boot Media:** `U25.iso`  
+
+</details>
+
+<details><summary>📡 VM2: PXE Client</summary>
+
+### ⚙️ VMware Config
+
+- 🖥 **CPU:** 1 × 2 cores  
+- 🧠 **Memory:** 4 GB RAM  
+- 💽 **Disk:** 20 GB HDD  
+- 🌍 **Network 1:** VMnet0  
+- 📀 **Boot Media:** NO DISK (WILL INSTALL OPERATING SYSTEM LATER)
+
+Prior starting the vm add the following line to the vmx file (e.g. machine1.vmx)
+
+```bash
+ethernet0.virtualDev = "e1000" # add this line
+```
+
+(otherwise hookos will not know the network adapter from vmware workstation)
+
+</details>
+
 ## DEPLOYMENT STACK/TINKERBELL-SERVER
 
 <details><summary>INSTALL REQUIREMENTS</summary>
@@ -337,28 +396,4 @@ default     u22-machine1-workflow   ubuntu22   SUCCESS   kexec into os   00:0c:2
 
 </details>
 
-## VMWARE WORKSTATION TESTING ENVIRONMENT
 
-<details><summary>CREATE VMware Networks</summary>
-
-### 🌐 Custom Network: **VMnet0**
-- **Type:** Custom  
-- **Host Connection:** ❌ Not connected  
-- **DHCP:** ❌ Disabled  
-- **Subnet:** `192.168.56.0/24`  
-- **Mode:** ✅ Host-only  
-
-</details>
-
-<details><summary>📡 PXE Server (Stack)</summary>
-
-### ⚙️ VMware Config
-
-- 🖥 **CPU:** 2 × 4 cores  
-- 🧠 **Memory:** 4 GB RAM  
-- 💽 **Disk:** 20 GB HDD  
-- 🌍 **Network 1:** NAT  
-- 🌍 **Network 2:** VMnet0  
-- 📀 **Boot Media:** `U25.iso`  
-
-</details>
