@@ -60,6 +60,28 @@ ethernet0.virtualDev = "e1000" # add this line
 
 </details>
 
+<details><summary>SSH INTO VMS OF HOST ONLY NETWORK</summary>
+
+You need to put the host on the same host-only network as the VM.
+
+Open Virtual Network Editor.
+
+Select VMnet0 (your 192.168.56.0/24 host-only network).
+
+Tick “Connect a host virtual adapter to this network”.
+
+Click Apply.
+→ Windows will then get a new virtual adapter (e.g. “VMware Network Adapter VMnet0”).
+
+Run ipconfig again – you should see something like:
+
+```bash
+Ethernet adapter VMware Network Adapter VMnet0:
+    IPv4 Address. . . . . . : 192.168.56.1
+```
+
+Now you can SSH to 192.168.56.2 from Windows.
+
 ## OPTIONAL: CONFIGURE ROUTER VM
 
 <details><summary>🔌 OVERVIEW</summary>
