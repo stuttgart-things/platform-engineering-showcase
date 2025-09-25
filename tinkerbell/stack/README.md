@@ -82,6 +82,8 @@ Ethernet adapter VMware Network Adapter VMnet0:
 
 Now you can SSH to 192.168.56.2 from Windows.
 
+</details>
+
 ## OPTIONAL: CONFIGURE ROUTER VM
 
 <details><summary>🔌 OVERVIEW</summary>
