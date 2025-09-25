@@ -2,7 +2,9 @@
 
 ## OPTIONAL: VMWARE WORKSTATION TESTING ENVIRONMENT
 
-<details><summary>CREATE VMware Networks</summary>
+<details><summary>🔌 NETWORK CONFIG</summary>
+
+* OPEN VMWARE NETTWORK EDITOR
 
 ### 🌐 Custom Network: **VMnet0**
 - **Type:** Custom  
