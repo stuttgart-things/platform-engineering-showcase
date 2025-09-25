@@ -33,8 +33,7 @@
 - 🖥 **CPU:** 2 × 4 cores  
 - 🧠 **Memory:** 4 GB RAM  
 - 💽 **Disk:** 20 GB HDD  
-- 🌍 **Network 1:** NAT  
-- 🌍 **Network 2:** VMnet0  
+- 🌍 **Network 1:** VMnet0  
 - 📀 **Boot Media:** `U25.iso`  
 
 </details>
