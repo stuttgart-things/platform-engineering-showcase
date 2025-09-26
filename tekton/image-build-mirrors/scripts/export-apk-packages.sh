@@ -72,15 +72,19 @@ $RUNTIME run --rm \
   -v "$MIRROR_DIR:/mirror" \
   "$IMAGE" sh -euxc "
     cd /mirror
-    echo \"[INFO] Using Alpine v\$VERSION_ID repository\"
-    echo \"http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/main\" > /etc/apk/repositories
+    echo \"[INFO] Using Alpine v\$VERSION_ID repositories\"
+    {
+      echo \"http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/main\"
+      echo \"http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/community\"
+    } > /etc/apk/repositories
 
     apk update
     echo \"[INFO] Fetching APK_PACKAGES: \$APK_PACKAGES\"
     apk fetch --recursive --output . \$APK_PACKAGES
 
-    echo \"[INFO] Fetching APKINDEX\"
-    wget -q http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/main/x86_64/APKINDEX.tar.gz
+    echo \"[INFO] Fetching APKINDEX (main + community)\"
+    wget -q http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/main/x86_64/APKINDEX.tar.gz -O APKINDEX-main.tar.gz
+    wget -q http://dl-cdn.alpinelinux.org/alpine/v\$VERSION_ID/community/x86_64/APKINDEX.tar.gz -O APKINDEX-community.tar.gz
   "
 
 echo "[INFO] APK packages and index saved under: $MIRROR_DIR"
