@@ -87,3 +87,5 @@ spec:
           configMap:
             defaultMode: 0700
             name: download-image
+#check: (example ip/port)
+#wget --spider http://192.168.56.117:7173/plucky-server-cloudimg-amd64.raw.gz
