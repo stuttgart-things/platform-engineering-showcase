@@ -7,6 +7,74 @@ vars:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
 
 tasks:
+  run-terraform-shell:
+    cmds:
+      - |
+        MOUNT=$(echo "{{.directory | join "\n"}}" | gum choose)
+        dagger -c '
+          container |
+            from cgr.dev/chainguard/wolfi-base |
+            with-exec apk add curl git bash wget terraform kubectl |
+            with-mounted-directory "'"$MOUNT"'" "'"$MOUNT"'" |
+            with-mounted-file /root/.kube/config ../../../.kube/keycloak-cluster |
+            terminal
+        '
+    vars:
+      directory:
+        - keycloak
+
+  destroy-kind-cluster:
+    desc: Destroy a KinD cluster
+    cmds:
+      - |
+        CLUSTERS=$(kind get clusters)
+        if [ -z "$CLUSTERS" ]; then
+          echo "No KinD clusters found."
+          exit 0
+        fi
+
+        CLUSTER_NAME=$(echo "$CLUSTERS" | gum choose)
+        echo "You chose: $CLUSTER_NAME"
+
+        if gum confirm "Do you really want to delete cluster $CLUSTER_NAME?"; then
+          kind delete cluster --name "$CLUSTER_NAME"
+          echo "Cluster $CLUSTER_NAME deleted."
+        else
+          echo "Aborted."
+        fi
+
+  create-kind-cluster:
+    desc: Create a new KinD cluster
+    cmds:
+      - |
+        PROFILE=$(echo "{{.profiles | join "\n"}}" | gum choose)
+        echo "You chose: $PROFILE"
+
+        mkdir -p {{ .KUBECONFIG_PATH }} || true
+
+        CLUSTER_NAME=$(basename "$PROFILE" .yaml)
+
+        if kind get clusters | grep -q "^$CLUSTER_NAME$"; then
+          echo "Cluster $CLUSTER_NAME already exists."
+          if gum confirm "Do you want to delete and recreate it?"; then
+            kind delete cluster --name "$CLUSTER_NAME"
+          else
+            echo "Aborting."
+            exit 0
+          fi
+        fi
+
+        kind create cluster \
+          --name "$CLUSTER_NAME" \
+          --config "$PROFILE" \
+          --kubeconfig {{ .KUBECONFIG_PATH }}/"$CLUSTER_NAME"
+    vars:
+      profiles:
+        - keycloak/keycloak-cluster.yaml
+        - kargo/kargo-cluster.yaml
+        - gateway-api/gateway-api-cluster.yaml
+      KUBECONFIG_PATH: ~/.kube
+
   create-dagger:
     desc: Create new dagger module
     cmds:

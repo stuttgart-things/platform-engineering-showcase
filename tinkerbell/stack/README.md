@@ -7,11 +7,11 @@
 * OPEN VMWARE NETTWORK EDITOR
 
 ### 🌐 Custom Network: **VMnet0**
-- **Type:** Custom  
-- **Host Connection:** ❌ Not connected  
-- **DHCP:** ❌ Disabled  
-- **Subnet:** `192.168.56.0/24`  
-- **Mode:** ✅ Host-only  
+- **Type:** Custom
+- **Host Connection:** ❌ Not connected
+- **DHCP:** ❌ Disabled
+- **Subnet:** `192.168.56.0/24`
+- **Mode:** ✅ Host-only
 
 </details>
 
@@ -19,12 +19,12 @@
 
 ### ⚙️ VMware Config
 
-- 🖥 **CPU:** 1 × 2 cores  
-- 🧠 **Memory:** 2 GB RAM  
-- 💽 **Disk:** 10 GB HDD  
+- 🖥 **CPU:** 1 × 2 cores
+- 🧠 **Memory:** 2 GB RAM
+- 💽 **Disk:** 10 GB HDD
 - 🌍 **Network 1:** NAT (WAN side, internet access)
 - 🌍 **Network 2:** Host-only (VMnet1) (LAN side, your other VMs connect here)
-- 📀 **Boot Media:** `Alpine.iso`  
+- 📀 **Boot Media:** `Alpine.iso`
 
 </details>
 
@@ -32,11 +32,11 @@
 
 ### ⚙️ VMware Config
 
-- 🖥 **CPU:** 2 × 4 cores  
-- 🧠 **Memory:** 4 GB RAM  
-- 💽 **Disk:** 20 GB HDD  
-- 🌍 **Network 1:** VMnet0  
-- 📀 **Boot Media:** `U25.iso`  
+- 🖥 **CPU:** 2 × 4 cores
+- 🧠 **Memory:** 4 GB RAM
+- 💽 **Disk:** 20 GB HDD
+- 🌍 **Network 1:** VMnet0
+- 📀 **Boot Media:** `U25.iso`
 
 </details>
 
@@ -44,10 +44,10 @@
 
 ### ⚙️ VMware Config
 
-- 🖥 **CPU:** 1 × 2 cores  
-- 🧠 **Memory:** 4 GB RAM  
-- 💽 **Disk:** 20 GB HDD  
-- 🌍 **Network 1:** VMnet0  
+- 🖥 **CPU:** 1 × 2 cores
+- 🧠 **Memory:** 4 GB RAM
+- 💽 **Disk:** 20 GB HDD
+- 🌍 **Network 1:** VMnet0
 - 📀 **Boot Media:** NO DISK (WILL INSTALL OPERATING SYSTEM LATER)
 
 Prior starting the vm add the following line to the vmx file (e.g. machine1.vmx)
@@ -507,5 +507,3 @@ default     u22-machine1-workflow   ubuntu22   SUCCESS   kexec into os   00:0c:2
 ```
 
 </details>
-
-

@@ -3,27 +3,44 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: keycloak-cluster
 networking:
-  disableDefaultCNI: false
+  apiServerAddress: 10.100.136.150
+  disableDefaultCNI: true
+  kubeProxyMode: none
 nodes:
   - role: control-plane
-    image: kindest/node:v1.33.2
-  - role: worker
-    image: kindest/node:v1.33.2
+    image: kindest/node:v1.34.0
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: ingress-ready=true
     extraPortMappings:
-      - containerPort: 31633 # Grafana
-        hostPort: 31633
-      - containerPort: 31634 # Keycloak
-        hostPort: 31634
-      - containerPort: 31635 # Gitea
-        hostPort: 31635
-    extraMounts:
-      - hostPath: /mnt/keycloak-cluster1  # Host directory to mount
-        containerPath: /data              # Mount path inside the KinD node
+      # KUBE-API
+      - containerPort: 6443
+        hostPort: 30774
+        protocol: TCP
+      # INGRESS
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      # SOME NODEPORTS
+      - containerPort: 31543
+        hostPort: 31543
+      - containerPort: 31544
+        hostPort: 31544
+      - containerPort: 31545
+        hostPort: 31545
+      - containerPort: 31546
+        hostPort: 31546
   - role: worker
-    image: kindest/node:v1.33.2
+    image: kindest/node:v1.34.0
     extraMounts:
-      - hostPath: /mnt/keycloak-cluster2  # Host directory to mount
-        containerPath: /data              # Mount path inside the KinD node
+      - hostPath: /mnt/data-node1  # Host directory to mount
+        containerPath: /data       # Mount path inside the KinD node
 containerdConfigPatches:
   - |-
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]

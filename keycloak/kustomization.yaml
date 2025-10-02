@@ -1,0 +1,5 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://raw.githubusercontent.com/cilium/cilium/2a2776ee4311077f176eb3ae3a11b597484af2ec/pkg/k8s/apis/cilium.io/client/crds/v2alpha1/ciliuml2announcementpolicies.yaml
+  - https://raw.githubusercontent.com/cilium/cilium/2a2776ee4311077f176eb3ae3a11b597484af2ec/pkg/k8s/apis/cilium.io/client/crds/v2/ciliumloadbalancerippools.yaml

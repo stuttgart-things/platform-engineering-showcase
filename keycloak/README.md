@@ -5,14 +5,22 @@
 <details><summary>CREATE KEYCLOAK-CLUSTER</summary>
 
 ```bash
-KUBECONFIG_PATH=~/.kube/kind-keycloak
+# TASKFILE
+task create-kind-cluster
+
+# MANUAL
+KUBECONFIG_PATH=~/.kube/keycloak-cluster
 
 mkdir -p ~/.kube || true
 
 kind create cluster \
 --config keycloak-cluster.yaml \
 --kubeconfig ${KUBECONFIG_PATH}
+```
 
+```bash
+# COMMECT
+KUBECONFIG_PATH=~/.kube/keycloak-cluster
 export KUBECONFIG=${KUBECONFIG_PATH}
 kubectl get nodes
 ```
@@ -38,11 +46,17 @@ kubectl wait --for=condition=ready pod --all -n keycloak --timeout=300s
 ```bash
 cd base
 
+# INITIAL PW FOR KEYCLOAK USERS
 INITIAL_PASSWORD=$(date +%s | sha256sum | base64 | head -c 15)
 echo ${INITIAL_PASSWORD}
 
-# EXAMPLE FILE - COULD BE CHANGED
-cat <<EOF > ./terraform.tfvars.json
+VARS_FOLER=/tmp/platform-engineering-showcase/keycloak
+VARS_NAME=terraform.tfvars.json
+
+# EXAMPLE VARS FILE - COULD BE CHANGED
+mkdir -p ${VARS_FOLER}
+
+cat <<EOF > ${VARS_FOLER}/${VARS_NAME}
 {
   "realm_groups": ["apps-admin"],
   "users": [
@@ -71,13 +85,15 @@ EOF
 
 export TF_VAR_keycloak_client_id="admin-cli"
 export TF_VAR_keycloak_username="admin"
-export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD} # SET/FROM KEYCLOAK DEPLOYMENT STEP
-export TF_VAR_keycloak_url="http://localhost:31634"
+export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD}
+# SET/FROM KEYCLOAK DEPLOYMENT STEP
+export TF_VAR_keycloak_url="http://$(hostname -f):31634"
 export TF_VAR_keycloak_realm="master"
 export TF_VAR_realm_name="apps"
 
+export KUBE_CONFIG_PATH=${KUBECONFIG_PATH}
 terraform init --upgrade
-terraform apply --auto-approve
+terraform apply --auto-approve -var-file=${VARS_FOLER}/${VARS_NAME}
 
 cd -
 ```
@@ -94,11 +110,12 @@ cd grafana/config
 export TF_VAR_keycloak_client_id="admin-cli"
 export TF_VAR_keycloak_username="admin"
 export TF_VAR_keycloak_password=${KEYCLOAK_ADMIN_PASSWORD} # SET/FROM KEYCLOAK DEPLOYMENT STEP
-export TF_VAR_keycloak_url="http://localhost:31634"
+export TF_VAR_keycloak_url="http://$(hostname -f):31634"
 export TF_VAR_keycloak_realm="master"
 export TF_VAR_realm_name="apps"
 export TF_VAR_grafana_url="http://$(hostname -f):31633"
 
+export KUBE_CONFIG_PATH=${KUBECONFIG_PATH}
 terraform init --upgrade
 terraform apply --auto-approve
 
@@ -120,15 +137,15 @@ export KIND_HOST=$(hostname -f)
 helmfile apply -f grafana/deploy/grafana.yaml
 
 # ADD CLIENT SECRET
-kubectl -n grafana patch cm grafana-deployment \
+kubectl -n observability patch cm grafana-deployment \
   --type merge \
-  -p "$(kubectl -n grafana get cm grafana-deployment -o json \
+  -p "$(kubectl -n observability get cm grafana-deployment -o json \
     | jq ".data[\"grafana.ini\"] |= ( sub(\"client_id = grafana\"; \"client_id = grafana\nclient_secret = ${GRAFANA_CLIENT_SECRET}\") )")"
 
-kubectl -n grafana get cm grafana-deployment -n grafana -o yaml
+kubectl -n grafana get cm grafana-deployment -n observability -o yaml
 
 # RESTART
-kubectl delete po --all -n grafana
+kubectl delete po --all -n observability
 
 echo Check Grafana: http://$(hostname -f):31633
 
