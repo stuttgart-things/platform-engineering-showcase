@@ -12,6 +12,7 @@ helmfile init --force
 ```bash
 kubectl apply -k https://github.com/stuttgart-things/helm/cicd/crds/tekton?ref=v1.2.1
 helmfile apply -f tekton-base.yaml.gotmpl
+kubectk create ns tekton-ci
 ```
 
 ## PIPELINERUNS
@@ -65,7 +66,7 @@ metadata:
   annotations:
   labels:
     tekton.dev/pipeline: execute-ansible-playbooks
-  name: monday51
+  name: run-baseos-ansible-machine4
   namespace: tekton-ci
 spec:
   params:
@@ -83,20 +84,16 @@ spec:
     value: /ansible/workdir/
   - name: vaultSecretName
     value: vault
-  #- name: inventory
-  #  value: W2luaXRpYWxfbWFzdGVyX25vZGVdCjEwLjMxLjEwMy40MwoKW2FkZGl0aW9uYWxfbWFzdGVyX25vZGVzXQo=
+  - name: inventory
+    value: MTkyLjE2OC41Ni41NQo=
   - name: installExtraRoles
     value: "true"
   - name: ansibleExtraRoles
     value:
     - https://github.com/stuttgart-things/install-requirements.git,2024.05.11
-    - https://github.com/stuttgart-things/manage-filesystem.git,2024.06.07
-    - https://github.com/stuttgart-things/install-configure-vault.git
-    - https://github.com/stuttgart-things/create-send-webhook.git,2024-06-06
   - name: ansiblePlaybooks
     value:
-    - ansible/playbooks/prepare-env.yaml
-    - ansible/playbooks/base-os.yaml
+      - sthings.baseos.setup
   - name: ansibleVarsFile
     value:
     - manage_filesystem+-true
@@ -111,7 +108,7 @@ spec:
     - reboot_all+-false
   - name: ansibleVarsInventory
     value:
-    - all+["10.31.103.27"]
+    - all+["192.168.56.55"]
   - name: ansibleExtraCollections
     value:
     - community.crypto:2.22.3
@@ -123,6 +120,10 @@ spec:
     - awx.awx:24.6.1
     - community.hashi_vault:6.2.0
     - ansible.netcommon:7.1.0
+    - https://github.com/stuttgart-things/ansible/releases/download/sthings-container-25.0.286.tar.gz/sthings-container-25.0.286.tar.gz
+    - https://github.com/stuttgart-things/ansible/releases/download/sthings-baseos-25.6.990.tar.gz/sthings-baseos-25.6.990.tar.gz
+    - https://github.com/stuttgart-things/ansible/releases/download/sthings-awx-25.4.506.tar.gz/sthings-awx-25.4.506.tar.gz
+    - https://github.com/stuttgart-things/ansible/releases/download/sthings-rke-25.6.394.tar.gz/sthings-rke-25.6.394.tar.gz
   - name: installExtraCollections
     value: "true"
   pipelineRef:
