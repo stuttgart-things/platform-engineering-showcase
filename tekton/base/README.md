@@ -3,7 +3,8 @@
 ## REQUIREMENTS
 
 ```bash
-brew install helmfile
+brew install helmfile tektoncd-cli 
+#brew install kubectl helm k9s 
 helmfile init --force
 ```
 
@@ -66,18 +67,18 @@ metadata:
   annotations:
   labels:
     tekton.dev/pipeline: execute-ansible-playbooks
-  name: run-baseos-ansible-machine4
+  name: ansible-baseos-m4
   namespace: tekton-ci
 spec:
   params:
   - name: ansibleWorkingImage
-    value: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
+    value: ghcr.io/stuttgart-things/sthings-ansible:12.0.0
   - name: createInventory
     value: "true"
   - name: ansibleTargetHost
     value: all
   - name: gitRepoUrl
-    value: https://github.com/stuttgart-things/stuttgart-things.git
+    value: https://github.com/stuttgart-things/stage-time.git
   - name: gitRevision
     value: main
   - name: gitWorkspaceSubdirectory
