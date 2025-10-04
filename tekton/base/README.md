@@ -1,5 +1,12 @@
 # TEKTON-BASE
 
+## REQUIREMENTS
+
+```bash
+brew install helmfile
+helmfile init --force
+```
+
 ## DEPLOY
 
 ```bash
