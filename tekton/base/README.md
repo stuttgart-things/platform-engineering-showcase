@@ -1,20 +1,27 @@
 # TEKTON-BASE
 
-## REQUIREMENTS
+## DEPLOY
+
+<details><summary>INSTALL REQUIREMENTS</summary>
 
 ```bash
-brew install helmfile tektoncd-cli 
-#brew install kubectl helm k9s 
+brew install helmfile tektoncd-cli
+#brew install kubectl helm k9s
 helmfile init --force
 ```
 
-## DEPLOY
+</details>
+
+<details><summary>INSTALL TEKTON</summary>
 
 ```bash
+# export KUBECONFIG=~/.kube/tekton - EXAMPLE PATH
 kubectl apply -k https://github.com/stuttgart-things/helm/cicd/crds/tekton?ref=v1.2.1
 helmfile apply -f tekton-base.yaml.gotmpl
 kubectk create ns tekton-ci
 ```
+
+</details>
 
 ## PIPELINERUNS
 
@@ -56,7 +63,7 @@ stringData:
 EOF
 ```
 
-## PIPELINERUN
+## PIPELINERUNS
 
 ```bash
 kubectl apply -f - <<EOF
@@ -67,12 +74,12 @@ metadata:
   annotations:
   labels:
     tekton.dev/pipeline: execute-ansible-playbooks
-  name: ansible-baseos-m4
+  name: run-ansible-baseos
   namespace: tekton-ci
 spec:
   params:
   - name: ansibleWorkingImage
-    value: ghcr.io/stuttgart-things/sthings-ansible:12.0.0
+    value: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
   - name: createInventory
     value: "true"
   - name: ansibleTargetHost
@@ -86,7 +93,7 @@ spec:
   - name: vaultSecretName
     value: vault
   - name: inventory
-    value: MTkyLjE2OC41Ni41NQo=
+    value: MTAuMzEuMTAzLjI3Cg==
   - name: installExtraRoles
     value: "true"
   - name: ansibleExtraRoles
@@ -109,7 +116,7 @@ spec:
     - reboot_all+-false
   - name: ansibleVarsInventory
     value:
-    - all+["192.168.56.55"]
+    - all+["10.31.103.27"]
   - name: ansibleExtraCollections
     value:
     - community.crypto:2.22.3
