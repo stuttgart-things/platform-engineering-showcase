@@ -1,0 +1,139 @@
+---
+version: "3"
+
+vars:
+  KUBECONFIG_FOLDER: ~/.kube
+  DEFAULT_K3S_VERSION: "v1.34.1+k3s1"
+
+tasks:
+  install:
+    desc: Install K3s cluster (no kube-proxy, no CNI)
+    env:
+      K3S_VERSION:
+        sh: |
+          gum input --value "{{.DEFAULT_K3S_VERSION}}" --prompt "K3S VERSION? [default: {{.DEFAULT_K3S_VERSION}}]: "
+    cmds:
+      - |
+        if command -v k3s >/dev/null 2>&1; then
+          gum confirm "K3s already installed. Reinstall?" || exit 0
+        fi
+
+        OUTPUT_PATH=$(gum input --value "/tmp/k3s-config.yaml" --prompt "Where to save k3s config? [default: /tmp/k3s-config.yaml]: ")
+        CLUSTER_NAME=$(gum input --value "k3s" --prompt "Cluster name? [default: k3s]: ")
+        ROOT_PATH_KUBECONFIGS="${HOME}/.kube"
+
+        echo "Writing K3s config to ${OUTPUT_PATH}..."
+
+        cat <<EOF > "${OUTPUT_PATH}"
+        write-kubeconfig-mode: 0644
+        flannel-backend: none
+        disable-kube-proxy: true
+        disable-network-policy: true
+        cluster-init: true
+        disable:
+          - servicelb
+          - traefik
+        EOF
+
+        cat "${OUTPUT_PATH}"
+
+        gum confirm "Proceed with K3s installation?" || exit 0
+
+        echo "Installing K3s ${K3S_VERSION} ..."
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=${K3S_VERSION} K3S_CONFIG_FILE="${OUTPUT_PATH}" sudo sh -
+
+        echo "Waiting for K3s to be ready..."
+        sleep 5
+
+        mkdir -p "${ROOT_PATH_KUBECONFIGS}"
+        sudo cp /etc/rancher/k3s/k3s.yaml "${ROOT_PATH_KUBECONFIGS}/${CLUSTER_NAME}"
+        sudo chown $(id -u):$(id -g) "${ROOT_PATH_KUBECONFIGS}/${CLUSTER_NAME}"
+        chmod 644 "${ROOT_PATH_KUBECONFIGS}/${CLUSTER_NAME}"
+
+        echo "Verifying K3s installation..."
+        kubectl get nodes --kubeconfig "${ROOT_PATH_KUBECONFIGS}/${CLUSTER_NAME}"
+
+  cilium:config:
+    desc: Generate Cilium Helm values for kube-proxy replacement
+    cmds:
+      - |
+        OUTPUT_PATH=$(gum input --value "/tmp/cilium-values.yaml" --prompt "Where to save Cilium config? [default: /tmp/cilium-values.yaml]: ")
+
+        API_SERVER_IP=$(hostname -I | awk '{print $1}')
+        API_SERVER_PORT=6443
+
+        echo "Writing Cilium config to ${OUTPUT_PATH}..."
+
+        cat <<EOF > "${OUTPUT_PATH}"
+        ---
+        k8sServiceHost: ${API_SERVER_IP}
+        k8sServicePort: ${API_SERVER_PORT}
+        kubeProxyReplacement: true
+
+        l2announcements:
+          enabled: true
+
+        externalIPs:
+          enabled: true
+
+        k8sClientRateLimit:
+          qps: 50
+          burst: 200
+
+        operator:
+          replicas: 1
+          rollOutPods: true
+
+        rollOutCiliumPods: true
+
+        ingressController:
+          enabled: false
+        EOF
+
+        cat "${OUTPUT_PATH}"
+        echo "✅ Cilium config created at ${OUTPUT_PATH}"
+
+  cilium:install:
+    desc: Install Cilium as kube-proxy replacement
+    deps: [cilium:config]
+    cmds:
+      - |
+        CILIUM_CONFIG_PATH=$(gum input --value "/tmp/cilium-values.yaml" --prompt "Path to Cilium config? [default: /tmp/cilium-values.yaml]: ")
+        KUBECONFIG_PATH=$(gum input --value "${HOME}/.kube/k3s" --prompt "Path to kubeconfig? [default: ~/.kube/k3s]: ")
+
+        echo "Installing Cilium ${CILIUM_VERSION} using config ${CILIUM_CONFIG_PATH}..."
+        cilium install \
+          --values "${CILIUM_CONFIG_PATH}" \
+          --kubeconfig "${KUBECONFIG_PATH}" \
+          --wait=false
+
+        echo "WAITING FOR CILIUM PODS AND STATUS..."
+
+        ATTEMPTS=0
+        MAX_ATTEMPTS=60
+
+        until kubectl get pods -n kube-system -l k8s-app=cilium -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | grep -q "false"; do
+          ((ATTEMPTS++))
+          if [ ${ATTEMPTS} -ge ${MAX_ATTEMPTS} ]; then
+            echo "❌ Timeout waiting for Cilium pods to become ready."
+            kubectl get pods -n kube-system -l k8s-app=cilium
+            cilium status --kubeconfig "${KUBECONFIG_PATH}" || true
+            exit 1
+          fi
+          sleep 2
+        done
+
+        echo "✅ Cilium pods are running. Checking Cilium status..."
+
+        cilium status --kubeconfig "${KUBECONFIG_PATH}" || true
+
+  uninstall:
+    desc: Uninstall K3s completely
+    cmds:
+      - |
+        if ! command -v k3s >/dev/null 2>&1; then
+          echo "K3s not installed."
+          exit 0
+        fi
+        gum confirm "This will uninstall K3s and remove data. Continue?" || exit 0
+        sudo /usr/local/bin/k3s-uninstall.sh
