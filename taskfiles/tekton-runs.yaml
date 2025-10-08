@@ -1,0 +1,14 @@
+---
+version: "3"
+
+vars:
+  KUBECONFIG_FOLDER: ~/.kube
+  KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
+  KCL_ANSIBLE_PR_VERSION: latest
+
+tasks:
+  ansible:baseos:
+    desc: Run ansible playbook to prepare base OS
+    cmds:
+      - |
+        kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION }}
