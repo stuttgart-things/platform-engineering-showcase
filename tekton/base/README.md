@@ -94,8 +94,7 @@ brew install go-task/tap/go-task gum
 <details><summary>GENERATE ANSIBLE PIPELINERUNS</summary>
 
 ```bash
-export TASK_X_REMOTE_TASKFILES=1
-task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/refs/heads/main/taskfiles/tekton-runs.yaml create:ansible:pipelinerun
+task --taskfile ../../taskfiles/tekton-runs.yaml create:ansible:pipelinerun
 ```
 
 </details>

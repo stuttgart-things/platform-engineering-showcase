@@ -12,9 +12,9 @@ tasks:
     desc: Run ansible playbook to prepare base OS
     vars:
       SELECTED_KUBECONFIG:
-        sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
+        sh: task --taskfile tekton-runs.yaml  kube | grep '^export KUBECONFIG' | tail -n1
       INVENTORY:
-        sh: task --taskfile tekton-runs.yaml build:ansible:inventory
+        sh: task --taskfile tekton-runs.yaml  build:ansible:inventory
       DEFAULT_PREFIX:
         sh: echo "pr-ansible-$(openssl rand -hex 3)"
     cmds:
@@ -92,5 +92,5 @@ tasks:
     desc: Select a task to run
     cmds:
       - |
-        task=$(yq e '.tasks | keys' tekton-runs.yaml | sed 's/^- //' | gum choose)
-        task --taskfile tekton-runs.yaml ${task}
+        task=$(yq e '.tasks | keys' tekton-runs.yaml  | sed 's/^- //' | gum choose)
+        task --taskfile tekton-runs.yaml  ${task}
