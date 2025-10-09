@@ -19,8 +19,8 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 ```bash
 brew install helmfile tektoncd-cli
-#brew install kubectl helm k9s
-helmfile init --force
+# if not already installed
+brew install kubectl helm k9s
 ```
 
 ### INSTALL TEKTON
@@ -28,6 +28,7 @@ helmfile init --force
 ```bash
 # export KUBECONFIG=~/.kube/tekton - EXAMPLE PATH
 kubectl apply -k https://github.com/stuttgart-things/helm/cicd/crds/tekton?ref=v1.2.1
+helmfile init --force
 helmfile apply -f tekton-base.yaml.gotmpl
 kubectk create ns tekton-ci
 ```
@@ -85,7 +86,7 @@ EOF
 ```bash
 brew tap kcl-lang/tap
 brew install kcl
-brew install go-task/tap/go-task gum kubectl
+brew install go-task/tap/go-task gum
 ```
 
 </details>
