@@ -56,7 +56,7 @@ tasks:
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D ansiblePlaybooks='{{ .PLAYBOOKS }}' \
-          -D ansibleCollections='{{ .COLLECTIONS }}' \
+          -D ansibleExtraCollections='{{ .COLLECTIONS }}' \
           -D inventory="{{ .INVENTORY }}" \
           | tee "${OUTPUT_FILE}"
 
