@@ -70,6 +70,8 @@ tasks:
           echo "No PipelineRun found in namespace ${SELECTED_NAMESPACE}!"
         fi
 
+        echo "Check logs with 'tkn pr logs ${LATEST_PR} -n ${SELECTED_NAMESPACE} -f'"
+
   build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded
     silent: true
