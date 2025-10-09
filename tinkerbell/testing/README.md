@@ -266,7 +266,8 @@ ethernet0.virtualDev = "e1000" # add this line
 
 # ANSIBLE PLAYBOOK PROVISIONING
 
-```yaml
+```bash
+cat <<EOF > playbook.yaml
 - name: Wait for target machine to be reachable
   hosts: localhost
   gather_facts: no
@@ -335,7 +336,7 @@ ethernet0.virtualDev = "e1000" # add this line
         pre_reboot_delay: "{{ reboot_pre_delay }}"
         post_reboot_delay: "{{ reboot_post_delay }}"
         reboot_timeout: "{{ reboot_timeout }}"
-
+EOF
 ```
 
 ## EXAMPLE EXECUTION
