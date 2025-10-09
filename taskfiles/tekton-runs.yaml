@@ -5,7 +5,7 @@ vars:
   KUBECONFIG_FOLDER: ~/.kube
   KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
   KCL_ANSIBLE_PR_VERSION: latest
-  ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:12.0.0
+  ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
 
 tasks:
   create:ansible:pipelinerun:
@@ -16,7 +16,7 @@ tasks:
       INVENTORY:
         sh: task --taskfile tekton-runs.yaml  build:ansible:inventory
       DEFAULT_PREFIX:
-        sh: echo "pr-ansible-$(openssl rand -hex 3)"
+        sh: echo "pr-ansible"
     cmds:
       - |
         {{ .SELECTED_KUBECONFIG }}
@@ -43,8 +43,9 @@ tasks:
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
-          -D inventory="{{ .INVENTORY }} \
-          | kubectl -n  apply -f -"
+          -D inventory="{{ .INVENTORY }} > /tmp/pr.yaml"
+
+        kubectl -n ${SELECTED_NAMESPACE} apply -f /tmp/pr.yaml
 
         gum spin --title "Creating tekton pipelinerun.." -- sleep 5
         tkn pr list -n ${SELECTED_NAMESPACE}
