@@ -1,0 +1,96 @@
+---
+version: "3"
+
+vars:
+  KUBECONFIG_FOLDER: ~/.kube
+  KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
+  KCL_ANSIBLE_PR_VERSION: latest
+  ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:12.0.0
+
+tasks:
+  create:ansible:pipelinerun:
+    desc: Run ansible playbook to prepare base OS
+    vars:
+      SELECTED_KUBECONFIG:
+        sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
+      INVENTORY:
+        sh: task --taskfile tekton-runs.yaml build:ansible:inventory
+      DEFAULT_PREFIX:
+        sh: echo "pr-ansible-$(openssl rand -hex 3)"
+    cmds:
+      - |
+        {{ .SELECTED_KUBECONFIG }}
+        kubectl get nodes
+
+        # Ask for StorageClass
+        SELECTED_SC=$(kubectl get sc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the StorageClass to use for provisioning volumes")
+        echo "Selected StorageClass: ${SELECTED_SC}"
+
+        # Ask for Namespace
+        SELECTED_NAMESPACE=$(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the Namespace to use for the pipeline run")
+        echo "Selected Namespace: ${SELECTED_NAMESPACE}"
+
+        # Ask for Ansible working image (default = {{ .ANSIBLE_WORKING_IMAGE }})
+        ANSIBLE_IMAGE=$(gum input --header "Enter the Ansible working image" --placeholder "Enter Ansible working image" --value "{{ .ANSIBLE_WORKING_IMAGE }}")
+        echo "Using Ansible working image: ${ANSIBLE_IMAGE}"
+
+        # Ask for pipeline prefix (default = {{ .DEFAULT_PREFIX }})
+        PIPELINE_PREFIX=$(gum input --header "Enter the pipeline prefix" --placeholder "Enter pipeline prefix" --value "{{ .DEFAULT_PREFIX }}")
+        echo "Using pipeline prefix: ${PIPELINE_PREFIX}"
+
+        # Run KCL pipeline
+        kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION }} \
+          -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
+          -D storageClass="${SELECTED_SC}" \
+          -D pipelinePrefix="${PIPELINE_PREFIX}" \
+          -D inventory="{{ .INVENTORY }}"
+
+  build:ansible:inventory:
+    desc: Interactively build an Ansible inventory and print it Base64-encoded
+    silent: true
+    cmds:
+      - |
+        gum spin --title "Creating ansible inventory.." -- sleep 2
+        INVENTORY=""
+        while true; do
+          GROUP=$(gum input --placeholder "Enter inventory group name (or leave empty to finish)")
+          if [ -z "$GROUP" ]; then
+            break
+          fi
+
+          INVENTORY="${INVENTORY}\n[${GROUP}]"
+
+          while true; do
+            HOST=$(gum input --placeholder "Enter host for group '$GROUP' (or leave empty to finish group)")
+            if [ -z "$HOST" ]; then
+              break
+            fi
+            INVENTORY="${INVENTORY}\n${HOST}"
+          done
+
+          INVENTORY="${INVENTORY}\n"
+        done
+
+        # Trim leading newline and encode
+        ENCODED=$(echo -e "$INVENTORY" | sed '/^$/d' | base64 -w0)
+        echo "$ENCODED"
+
+  kube:
+    desc: Select kubeconfig
+    cmds:
+      - |
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }} --header "Select the Kubeconfig to use")
+        echo SWITCHING TO ${SELECTED_KUBECONFIG//\"/}
+        export KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${SELECTED_KUBECONFIG//\"/}
+        kubectl get nodes
+        printf "\n\nexport KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${SELECTED_KUBECONFIG//\"/}\n\n"
+    vars:
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_FOLDER }} | xargs -n1 printf '"%s" '
+
+  do:
+    desc: Select a task to run
+    cmds:
+      - |
+        task=$(yq e '.tasks | keys' tekton-runs.yaml | sed 's/^- //' | gum choose)
+        task --taskfile tekton-runs.yaml ${task}
