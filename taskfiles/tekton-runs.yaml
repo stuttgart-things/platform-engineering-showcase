@@ -45,8 +45,6 @@ tasks:
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D inventory="{{ .INVENTORY }}" | kubectl apply -f -
 
-        # kubectl -n ${SELECTED_NAMESPACE} apply -f /tmp/pr.yaml
-
         gum spin --title "Creating tekton pipelinerun.." -- sleep 5
         tkn pr list -n ${SELECTED_NAMESPACE}
 
