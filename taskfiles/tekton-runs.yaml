@@ -44,7 +44,10 @@ tasks:
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D inventory="{{ .INVENTORY }} \
-          | kubectl apply -f -"
+          | kubectl -n  apply -f -"
+
+        gum spin --title "Creating tekton pipelinerun.." -- sleep 5
+        tkn pr list -n ${SELECTED_NAMESPACE}
 
   build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded

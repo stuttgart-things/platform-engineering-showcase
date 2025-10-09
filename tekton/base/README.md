@@ -97,7 +97,12 @@ brew install go-task/tap/go-task gum
 task --taskfile ../../taskfiles/tekton-runs.yaml create:ansible:pipelinerun
 
 
-10.31.103.27
+* inventory group name could be: all
+* inventory host name could be: 10.100.136.136 or a fqdn
+* storage class could be: openebs-hostpath
+* storage class could be: tekton-ci
+
+
 ```
 
 </details>
