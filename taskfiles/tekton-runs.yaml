@@ -43,7 +43,7 @@ tasks:
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
-          -D inventory="{{ .INVENTORY }} > /tmp/pr.yaml"
+          -D inventory="{{ .INVENTORY }}" > /tmp/pr.yaml"
 
         kubectl -n ${SELECTED_NAMESPACE} apply -f /tmp/pr.yaml
 
