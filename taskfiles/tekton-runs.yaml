@@ -8,13 +8,13 @@ vars:
   ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:12.0.0
 
 tasks:
-  ansible:baseos:
+  create:ansible:pipelinerun:
     desc: Run ansible playbook to prepare base OS
     vars:
       SELECTED_KUBECONFIG:
         sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
       INVENTORY:
-        sh: task --taskfile tekton-runs.yaml build:inventory
+        sh: task --taskfile tekton-runs.yaml build:ansible:inventory
       DEFAULT_PREFIX:
         sh: echo "pr-ansible-$(openssl rand -hex 3)"
     cmds:
@@ -23,19 +23,19 @@ tasks:
         kubectl get nodes
 
         # Ask for StorageClass
-        SELECTED_SC=$(kubectl get sc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose)
+        SELECTED_SC=$(kubectl get sc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the StorageClass to use for provisioning volumes")
         echo "Selected StorageClass: ${SELECTED_SC}"
 
         # Ask for Namespace
-        SELECTED_NAMESPACE=$(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose)
+        SELECTED_NAMESPACE=$(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the Namespace to use for the pipeline run")
         echo "Selected Namespace: ${SELECTED_NAMESPACE}"
 
         # Ask for Ansible working image (default = {{ .ANSIBLE_WORKING_IMAGE }})
-        ANSIBLE_IMAGE=$(gum input --placeholder "Enter Ansible working image" --value "{{ .ANSIBLE_WORKING_IMAGE }}")
+        ANSIBLE_IMAGE=$(gum input --header "Enter the Ansible working image" --placeholder "Enter Ansible working image" --value "{{ .ANSIBLE_WORKING_IMAGE }}")
         echo "Using Ansible working image: ${ANSIBLE_IMAGE}"
 
         # Ask for pipeline prefix (default = {{ .DEFAULT_PREFIX }})
-        PIPELINE_PREFIX=$(gum input --placeholder "Enter pipeline prefix" --value "{{ .DEFAULT_PREFIX }}")
+        PIPELINE_PREFIX=$(gum input --header "Enter the pipeline prefix" --placeholder "Enter pipeline prefix" --value "{{ .DEFAULT_PREFIX }}")
         echo "Using pipeline prefix: ${PIPELINE_PREFIX}"
 
         # Run KCL pipeline
@@ -45,14 +45,15 @@ tasks:
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D inventory="{{ .INVENTORY }}"
 
-  build:inventory:
+  build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded
     silent: true
     cmds:
       - |
+        gum spin --title "Creating ansible inventory.." -- sleep 2
         INVENTORY=""
         while true; do
-          GROUP=$(gum input --placeholder "Enter group name (or leave empty to finish)")
+          GROUP=$(gum input --placeholder "Enter inventory group name (or leave empty to finish)")
           if [ -z "$GROUP" ]; then
             break
           fi
@@ -78,7 +79,7 @@ tasks:
     desc: Select kubeconfig
     cmds:
       - |
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }} --header "Select the Kubeconfig to use")
         echo SWITCHING TO ${SELECTED_KUBECONFIG//\"/}
         export KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${SELECTED_KUBECONFIG//\"/}
         kubectl get nodes
