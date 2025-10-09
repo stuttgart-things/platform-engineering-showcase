@@ -30,7 +30,7 @@ brew install kubectl helm k9s
 kubectl apply -k https://github.com/stuttgart-things/helm/cicd/crds/tekton?ref=v1.2.1
 helmfile init --force
 helmfile apply -f tekton-base.yaml.gotmpl
-kubectk create ns tekton-ci
+kubectl create ns tekton-ci
 ```
 
 </details>
@@ -95,6 +95,9 @@ brew install go-task/tap/go-task gum
 
 ```bash
 task --taskfile ../../taskfiles/tekton-runs.yaml create:ansible:pipelinerun
+
+
+10.31.103.27
 ```
 
 </details>
