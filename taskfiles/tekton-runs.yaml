@@ -43,9 +43,9 @@ tasks:
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
-          -D inventory="{{ .INVENTORY }}" > /tmp/pr.yaml
+          -D inventory="{{ .INVENTORY }}" | kubectl apply -f -
 
-        kubectl -n ${SELECTED_NAMESPACE} apply -f /tmp/pr.yaml
+        # kubectl -n ${SELECTED_NAMESPACE} apply -f /tmp/pr.yaml
 
         gum spin --title "Creating tekton pipelinerun.." -- sleep 5
         tkn pr list -n ${SELECTED_NAMESPACE}
