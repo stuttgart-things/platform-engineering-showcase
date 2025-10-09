@@ -6,6 +6,8 @@ vars:
   KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
   KCL_ANSIBLE_PR_VERSION: latest
   ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
+  ALL_ANSIBLE_PLAYBOOKS: "sthings.baseos.prepare_env,sthings.baseos.setup,sthings.apps.deploy"
+  ALL_ANSIBLE_COLLECTIONS: "community.crypto:2.22.3,community.general:10.1.0,ansible.posix:2.0.0,kubernetes.core:5.0.0,community.docker:4.1.0,community.vmware:5.2.0,awx.awx:24.6.1,community.hashi_vault:6.2.0,ansible.netcommon:7.1.0,https://github.com/stuttgart-things/ansible/releases/download/sthings-container-25.0.286.tar.gz/sthings-container-25.0.286.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-baseos-25.6.990.tar.gz/sthings-baseos-25.6.990.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-awx-25.4.506.tar.gz/sthings-awx-25.4.506.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-rke-25.6.394.tar.gz/sthings-rke-25.6.394.tar.gz"
 
 tasks:
   create:ansible:pipelinerun:
@@ -15,10 +17,17 @@ tasks:
         sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
       INVENTORY:
         sh: task --taskfile tekton-runs.yaml build:ansible:inventory
+      NAME: horscht
+      PLAYBOOKS:
+        sh: task --taskfile tekton-runs.yaml listitems={{ .ALL_ANSIBLE_PLAYBOOKS }} pr:select:list
+      COLLECTIONS:
+        sh: task --taskfile tekton-runs.yaml listitems={{ .ALL_ANSIBLE_COLLECTIONS }} pr:select:list
       DEFAULT_PREFIX:
         sh: echo "pr-ansible"
     cmds:
       - |
+        echo ""  # Just to show the selected playbooks
+
         {{ .SELECTED_KUBECONFIG }}
         kubectl get nodes
 
@@ -45,6 +54,9 @@ tasks:
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
+          -D pipelinePrefix="${PIPELINE_PREFIX}" \
+          -D ansiblePlaybooks='{{ .PLAYBOOKS }}' \
+          -D ansibleCollections='{{ .COLLECTIONS }}' \
           -D inventory="{{ .INVENTORY }}" \
           | tee "${OUTPUT_FILE}"
 
@@ -123,21 +135,19 @@ tasks:
         task --taskfile tekton-runs.yaml  ${task}
 
   pr:select:list:
-    desc: Run ansible playbook to prepare base OS
+    desc: Get list items
     silent: true
-    vars:
-      playbooks: "sthings.baseos.prepare_env,sthings.baseos.setup,sthings.apps.deploy"
     cmds:
       - |
-        SELECTED=$(echo "{{.playbooks}}" | tr ',' '\n' | gum choose --no-limit)
+        SELECTED=$(echo "{{.listitems}}" | tr ',' '\n' | gum choose --no-limit)
 
         if [ -z "$SELECTED" ]; then
-          echo "No playbooks selected"
+          echo "No list items selected"
           exit 1
         fi
 
         # Convert to JSON array format
         JSON_ARRAY=$(echo "$SELECTED" | awk '{printf "\"%s\", ", $0}' | sed 's/, $//')
-        ANSIBLE_PLAYBOOKS="[${JSON_ARRAY}]"
+        SELECTED_LIST_ITEMS="[${JSON_ARRAY}]"
 
-        echo "-D ansiblePlaybooks='${ANSIBLE_PLAYBOOKS}'"
+        echo "${SELECTED_LIST_ITEMS}"
