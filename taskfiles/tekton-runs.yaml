@@ -39,14 +39,14 @@ tasks:
         echo "Using pipeline prefix: ${PIPELINE_PREFIX}"
 
         # Run KCL pipeline and save to file
-        OUTPUT_FILE="pipelinerun.yaml"
+        OUTPUT_FILE="/tmp/pipelinerun.yaml"
         echo "Generating Tekton PipelineRun manifest with KCL..."
         kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION}} \
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
           -D inventory="{{ .INVENTORY }}" \
-          > "${OUTPUT_FILE}"
+          | tee "${OUTPUT_FILE}"
 
         echo "KCL output saved to ${OUTPUT_FILE}"
 
