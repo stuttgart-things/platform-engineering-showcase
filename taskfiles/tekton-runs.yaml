@@ -58,6 +58,18 @@ tasks:
         gum spin --title "Creating tekton pipelinerun.." -- sleep 5
         tkn pr list -n "${SELECTED_NAMESPACE}"
 
+        # Get the most recent PipelineRun name
+        LATEST_PR=$(tkn pr list -n "${SELECTED_NAMESPACE}" --no-headers | head -n1 | awk '{print $1}')
+        echo "Most recent PipelineRun: ${LATEST_PR}"
+
+        # Show logs for that PipelineRun
+        if [ -n "${LATEST_PR}" ]; then
+          echo "Fetching logs for ${LATEST_PR}..."
+          tkn pr logs "${LATEST_PR}" -n "${SELECTED_NAMESPACE}" -f
+        else
+          echo "No PipelineRun found in namespace ${SELECTED_NAMESPACE}!"
+        fi
+
   build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded
     silent: true
