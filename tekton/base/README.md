@@ -4,15 +4,26 @@
 
 <details><summary>INSTALL REQUIREMENTS</summary>
 
+### INSTALL BREW
+
+```bash
+NONINTERACTIVE=1
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+echo >> ${HOME}/.bashrc
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ${HOME}/.bashrc
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+```
+
+### INSTALL REQUIREMENTS
+
 ```bash
 brew install helmfile tektoncd-cli
 #brew install kubectl helm k9s
 helmfile init --force
 ```
 
-</details>
-
-<details><summary>INSTALL TEKTON</summary>
+### INSTALL TEKTON
 
 ```bash
 # export KUBECONFIG=~/.kube/tekton - EXAMPLE PATH
