@@ -41,7 +41,7 @@ tasks:
         # Run KCL pipeline and save to file
         OUTPUT_FILE="/tmp/pipelinerun.yaml"
         echo "Generating Tekton PipelineRun manifest with KCL..."
-        kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION}} \
+        kcl run --quiet {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION}} \
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
