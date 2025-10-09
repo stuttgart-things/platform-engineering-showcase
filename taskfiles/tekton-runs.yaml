@@ -43,9 +43,9 @@ tasks:
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
-          -D inventory="{{ .INVENTORY }} > /tmp/pr-${PIPELINE_PREFIX}.yaml"
+          -D inventory="{{ .INVENTORY }} \
+          | kubectl apply -f -"
 
-        kubectl apply -f /tmp/pr-${PIPELINE_PREFIX}.yaml -n ${SELECTED_NAMESPACE}
   build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded
     silent: true
