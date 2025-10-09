@@ -263,3 +263,86 @@ ethernet0.virtualDev = "e1000" # add this line
 ```
 
 (otherwise hookos will not know the network adapter from vmware workstation)
+
+# ANSIBLE PLAYBOOK PROVISIONING
+
+```yaml
+- name: Wait for target machine to be reachable
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - ./defaults/u25.yaml
+
+  tasks:
+    - name: Wait for SSH port 22 to be open on target
+      ansible.builtin.wait_for:
+        host: "{{ target_ip }}"
+        port: "{{ target_port }}"
+        timeout: "{{ target_timeout }}"
+        state: started
+
+    - name: Wait until SSH is available
+      ansible.builtin.wait_for_connection:
+        timeout: "{{ ssh_wait_timeout }}"
+        sleep: "{{ ssh_wait_sleep }}"
+        delay: "{{ ssh_wait_delay }}"
+      delegate_to: "{{ target_ip }}"
+      vars:
+        ansible_user: "{{ bootstrap_user }}"
+        ansible_password: "{{ bootstrap_password }}"
+        ansible_ssh_common_args: "{{ bootstrap_ssh_args }}"
+
+- name: Configure target machine
+  hosts: all
+  become: true
+  gather_facts: no
+  vars_files:
+    - ./defaults/u25.yaml
+
+
+  roles:
+    - role: "{{ user_role }}"
+
+  tasks:
+    - name: Update all packages
+      apt:
+        update_cache: yes
+        upgrade: "{{ apt_upgrade_type }}"
+
+    - name: Ensure python3-venv is installed
+      apt:
+        name: "{{ python_venv_package }}"
+        state: present
+
+    - name: Create a virtual environment
+      command: "python3 -m venv {{ python_venv_path }}"
+      args:
+        creates: "{{ python_venv_path }}"
+
+    - name: Install required Python modules in venv
+      ansible.builtin.pip:
+        name: "{{ python_modules }}"
+        executable: "{{ python_venv_path }}/bin/pip"
+
+    - name: Set interpreter for later tasks
+      set_fact:
+        ansible_python_interpreter: "{{ python_venv_path }}/bin/python"
+
+  post_tasks:
+    - name: Reboot the machine
+      reboot:
+        msg: "{{ reboot_message }}"
+        pre_reboot_delay: "{{ reboot_pre_delay }}"
+        post_reboot_delay: "{{ reboot_post_delay }}"
+        reboot_timeout: "{{ reboot_timeout }}"
+
+```
+
+## EXAMPLE EXECUTION
+
+```bash
+# -e "@..." Overwrites path of vars-file 
+ansible-playbook -i inventory playbook.yaml -vv -e "@./defaults/u25.yaml" -e target_ip="192.168.56.55" -e ssh_pubkey_file="~/.ssh/sthings_id_rsa.pub"
+```
+
+
