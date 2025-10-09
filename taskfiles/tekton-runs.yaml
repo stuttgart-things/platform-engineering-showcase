@@ -38,15 +38,25 @@ tasks:
         PIPELINE_PREFIX=$(gum input --header "Enter the pipeline prefix" --placeholder "Enter pipeline prefix" --value "{{ .DEFAULT_PREFIX }}")
         echo "Using pipeline prefix: ${PIPELINE_PREFIX}"
 
-        # Run KCL pipeline
-        kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION }} \
+        # Run KCL pipeline and save to file
+        OUTPUT_FILE="pipelinerun.yaml"
+        echo "Generating Tekton PipelineRun manifest with KCL..."
+        kcl run {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION}} \
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
-          -D inventory="{{ .INVENTORY }}"
+          -D inventory="{{ .INVENTORY }}" \
+          > "${OUTPUT_FILE}"
 
+        echo "KCL output saved to ${OUTPUT_FILE}"
+
+        # Apply to cluster
+        echo "Applying PipelineRun to cluster..."
+        kubectl apply -f "${OUTPUT_FILE}" -n "${SELECTED_NAMESPACE}"
+
+        # Optionally show the created PipelineRun
         gum spin --title "Creating tekton pipelinerun.." -- sleep 5
-        tkn pr list -n ${SELECTED_NAMESPACE}
+        tkn pr list -n "${SELECTED_NAMESPACE}"
 
   build:ansible:inventory:
     desc: Interactively build an Ansible inventory and print it Base64-encoded
