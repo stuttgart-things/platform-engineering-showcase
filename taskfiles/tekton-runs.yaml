@@ -12,9 +12,9 @@ tasks:
     desc: Run ansible playbook to prepare base OS
     vars:
       SELECTED_KUBECONFIG:
-        sh: task --taskfile tekton-runs.yaml  kube | grep '^export KUBECONFIG' | tail -n1
+        sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
       INVENTORY:
-        sh: task --taskfile tekton-runs.yaml  build:ansible:inventory
+        sh: task --taskfile tekton-runs.yaml build:ansible:inventory
       DEFAULT_PREFIX:
         sh: echo "pr-ansible"
     cmds:
@@ -121,3 +121,23 @@ tasks:
       - |
         task=$(yq e '.tasks | keys' tekton-runs.yaml  | sed 's/^- //' | gum choose)
         task --taskfile tekton-runs.yaml  ${task}
+
+  pr:select:list:
+    desc: Run ansible playbook to prepare base OS
+    silent: true
+    vars:
+      playbooks: "sthings.baseos.prepare_env,sthings.baseos.setup,sthings.apps.deploy"
+    cmds:
+      - |
+        SELECTED=$(echo "{{.playbooks}}" | tr ',' '\n' | gum choose --no-limit)
+
+        if [ -z "$SELECTED" ]; then
+          echo "No playbooks selected"
+          exit 1
+        fi
+
+        # Convert to JSON array format
+        JSON_ARRAY=$(echo "$SELECTED" | awk '{printf "\"%s\", ", $0}' | sed 's/, $//')
+        ANSIBLE_PLAYBOOKS="[${JSON_ARRAY}]"
+
+        echo "-D ansiblePlaybooks='${ANSIBLE_PLAYBOOKS}'"
