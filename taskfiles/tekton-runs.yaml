@@ -4,7 +4,7 @@ version: "3"
 vars:
   KUBECONFIG_FOLDER: ~/.kube
   KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
-  KCL_ANSIBLE_PR_VERSION: latest
+  KCL_ANSIBLE_PR_VERSION: 0.2.1
   ANSIBLE_WORKING_IMAGE: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
   ALL_ANSIBLE_PLAYBOOKS: "sthings.baseos.prepare_env,sthings.baseos.setup,sthings.apps.deploy"
   ALL_ANSIBLE_COLLECTIONS: "community.crypto:2.22.3,community.general:10.1.0,ansible.posix:2.0.0,kubernetes.core:5.0.0,community.docker:4.1.0,community.vmware:5.2.0,awx.awx:24.6.1,community.hashi_vault:6.2.0,ansible.netcommon:7.1.0,https://github.com/stuttgart-things/ansible/releases/download/sthings-container-25.0.286.tar.gz/sthings-container-25.0.286.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-baseos-25.6.990.tar.gz/sthings-baseos-25.6.990.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-awx-25.4.506.tar.gz/sthings-awx-25.4.506.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-rke-25.6.394.tar.gz/sthings-rke-25.6.394.tar.gz"
