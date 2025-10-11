@@ -32,9 +32,7 @@ task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engi
 
 ## DEPLOY
 
-<details><summary>INSTALL REQUIREMENTS</summary>
-
-### INSTALL CLIS
+<details><summary>INSTALL CLIS</summary>
 
 ```bash
 brew install helmfile tektoncd-cli
@@ -42,7 +40,9 @@ brew install helmfile tektoncd-cli
 brew install kubectl k9s
 ```
 
-### DEPLOY TEKTON
+</details>
+
+<details><summary>DEPLOY TEKTON</summary>
 
 ```bash
 # export KUBECONFIG=~/.kube/tekton - EXAMPLE PATH
