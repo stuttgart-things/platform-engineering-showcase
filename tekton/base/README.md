@@ -1,29 +1,43 @@
 # TEKTON-BASE
 
-## DEPLOY
-
-<details><summary>INSTALL REQUIREMENTS</summary>
-
-### INSTALL BREW
+<details><summary>OPTIONAL: INSTALL BREW + TASKFILE</summary>
 
 ```bash
+# BREW
 NONINTERACTIVE=1
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 echo >> ${HOME}/.bashrc
 echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ${HOME}/.bashrc
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+# TASKFILE + GUM
+brew install go-task/tap/go-task gum 
 ```
 
-### INSTALL REQUIREMENTS
+</details>
+
+<details><summary>OPTIONAL: CREATE K3S CLUSTER</summary>
+
+```bash
+task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/refs/heads/main/taskfiles/k3s.yaml install
+```
+
+</details>
+
+## DEPLOY
+
+<details><summary>INSTALL REQUIREMENTS</summary>
+
+### INSTALL CLIS
 
 ```bash
 brew install helmfile tektoncd-cli
 # if not already installed
-brew install kubectl helm k9s
+brew install kubectl k9s
 ```
 
-### INSTALL TEKTON
+### DEPLOY TEKTON
 
 ```bash
 # export KUBECONFIG=~/.kube/tekton - EXAMPLE PATH
@@ -35,9 +49,19 @@ kubectl create ns tekton-ci
 
 </details>
 
-## PIPELINERUN-REQUIREMENTS
+## CREATE PIPELINERUNS
 
-<details><summary>CREATE SECRETS</summary>
+<details><summary>INSTALL REQUIREMENTS</summary>
+
+```bash
+brew tap kcl-lang/tap
+brew install kcl
+brew install go-task/tap/go-task gum
+```
+
+</details>
+
+<details><summary>CREATE ANSIBLERUN SECRETS</summary>
 
 ## CREATE SSH USER-CREDS AS SECRET
 
@@ -56,7 +80,7 @@ stringData:
 EOF
 ```
 
-## CREATE SSH USER-CREDS AS SECRET
+## CREATE VAULT USER-CREDS AS SECRET
 
 secret must exist, values doesnt matter if you're not using vault.
 
@@ -79,30 +103,15 @@ EOF
 
 </details>
 
-## CREATE PIPELINERUNS
-
-<details><summary>INSTALL REQUIREMENTS</summary>
-
-```bash
-brew tap kcl-lang/tap
-brew install kcl
-brew install go-task/tap/go-task gum
-```
-
-</details>
-
 <details><summary>GENERATE ANSIBLE PIPELINERUNS</summary>
 
 ```bash
 task --taskfile ../../taskfiles/tekton-runs.yaml create:ansible:pipelinerun
 
-
 * inventory group name could be: all
 * inventory host name could be: 10.100.136.136 or a fqdn
 * storage class could be: openebs-hostpath
 * storage class could be: tekton-ci
-
-
 ```
 
 </details>
