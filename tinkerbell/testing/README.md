@@ -342,8 +342,6 @@ EOF
 ## EXAMPLE EXECUTION
 
 ```bash
-# -e "@..." Overwrites path of vars-file 
+# -e "@..." Overwrites path of vars-file
 ansible-playbook -i inventory playbook.yaml -vv -e "@./defaults/u25.yaml" -e target_ip="192.168.56.55" -e ssh_pubkey_file="~/.ssh/sthings_id_rsa.pub"
 ```
-
-

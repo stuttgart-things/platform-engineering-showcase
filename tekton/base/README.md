@@ -14,7 +14,7 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 # TASKFILE + GUM
 ## on Ubuntu25:
 ## sudo apt install gcc
-brew install go-task/tap/go-task gum 
+brew install go-task/tap/go-task gum
 ```
 
 </details>
@@ -56,7 +56,7 @@ kubectl create ns tekton-ci
 
 </details>
 
-## CREATE PIPELINERUNS
+## PIPELINERUNS
 
 <details><summary>INSTALL REQUIREMENTS</summary>
 
@@ -67,6 +67,25 @@ brew install go-task/tap/go-task gum
 ```
 
 </details>
+
+
+### BUILDAH
+
+<details><summary>KCL-RUN APPLY</summary>
+
+```bash
+# EXAMPLE OVERWRITES
+kcl run oci://ghcr.io/stuttgart-things/kcl-tekton-buildah \
+--quiet -D gitUrl=https://github.com/stuttgart-things/stage-time \
+-D branchName=main \
+-D context=tests/test-app \
+-D verifySsl='"true"' \
+| kubectl -n tekton-ci apply -f -
+```
+
+</details>
+
+### ANSIBLE
 
 <details><summary>CREATE ANSIBLERUN SECRETS</summary>
 
