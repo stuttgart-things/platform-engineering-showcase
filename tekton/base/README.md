@@ -12,6 +12,8 @@ echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ${HOME}/.bashrc
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # TASKFILE + GUM
+## on Ubuntu25:
+## sudo apt install gcc
 brew install go-task/tap/go-task gum 
 ```
 
