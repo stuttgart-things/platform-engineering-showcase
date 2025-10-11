@@ -20,8 +20,12 @@ brew install go-task/tap/go-task gum
 <details><summary>OPTIONAL: CREATE K3S CLUSTER</summary>
 
 ```bash
+brew install cilium-cli
 export TASK_X_REMOTE_TASKFILES=1
 task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/refs/heads/main/taskfiles/k3s.yaml install
+task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/refs/heads/main/taskfiles/k3s.yaml cilium:install
+
+# uninstall k3s w/ task --taskfile https://raw.githubusercontent.com/stuttgart-things/platform-engineering-showcase/refs/heads/main/taskfiles/k3s.yaml uninstall
 ```
 
 </details>
