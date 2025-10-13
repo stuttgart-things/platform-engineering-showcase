@@ -1,0 +1,10 @@
+---
+apiVersion: "tinkerbell.org/v1alpha1"
+kind: Workflow
+metadata:
+  name: u25-machine5-workflow
+spec:
+  templateRef: ubuntu25
+  hardwareRef: machine5
+  hardwareMap:
+    device_1: "00:50:56:28:a3:3d"

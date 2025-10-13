@@ -1,0 +1,35 @@
+---
+apiVersion: tinkerbell.org/v1alpha1
+kind: Hardware
+metadata:
+  name: machine5
+spec:
+  disks:
+    - device: /dev/sda   # replace with actual VM disk device if different
+  metadata:
+    facility:
+      facility_code: playground
+    instance:
+      hostname: "machine5"
+      id: "00:50:56:28:a3:3d"   # must match the MAC
+      operating_system:
+        distro: "ubuntu"
+        os_slug: "ubuntu_25_04"
+        version: "25.04"
+  interfaces:
+    - dhcp:
+        arch: x86_64
+        hostname: machine5
+        ip:
+          address: 192.168.56.55       # replace with your VM’s PXE IP
+          netmask: 255.255.255.0
+          gateway: 192.168.56.2
+        lease_time: 86400
+        mac: "00:50:56:28:a3:3d"
+        name_servers:
+          - 1.1.1.1
+          - 8.8.8.8
+        uefi: false                   # set true if your VM boots in UEFI mode
+      netboot:
+        allowPXE: true
+        allowWorkflow: true
