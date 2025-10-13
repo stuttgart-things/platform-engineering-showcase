@@ -1,6 +1,8 @@
 # KIND
 
-## PLATFORM CLUSTER
+## CREATE
+
+<details><summary>CREATE CLUSTER</summary>
 
 ```bash
 # CREATE CLUSTER
@@ -9,31 +11,92 @@ KUBECONFIG_PATH=~/.kube/kind-platform
 mkdir -p ~/.kube || true
 
 kind create cluster \
---config platform-cluster.yaml \
+--config cluster.yaml \
 --kubeconfig ${KUBECONFIG_PATH}
+
+# REPLACE IP
+yq -i '.clusters[0].cluster.server = "https://'"$(hostname -I | awk '{print $1}')"':31643"' ${KUBECONFIG_PATH}
+
 
 export KUBECONFIG=${KUBECONFIG_PATH}
 kubectl get nodes
+```
 
-## DEPLOY CLUSTER-INFRA
+</details>
+
+<details><summary>DEPLOY CLUSTER-INFRA</summary>
 
 ```bash
+## DEPLOY CLUSTER-INFRA
 export KUBECONFIG=${KUBECONFIG_PATH}
 export HELMFILE_CACHE_HOME=/tmp/helm-cache
 
 helmfile init --force
 
-for cmd in apply sync; do
-  for i in {1..8}; do
-    helmfile -f cluster-infra.yaml $cmd && break
-    [ $i -eq 8 ] && exit 1
-    sleep 15
-  done
-done
+kubectl apply -k https://github.com/stuttgart-things/helm/infra/crds/cilium
+
+helmfile apply -f infra.yaml
 
 kubectl get nodes
 ```
 
+</details>
+
+<details><summary>DEPLOY VCLUSTER</summary>
+
+```bash
+# CREATE VALUES
+---
+controlPlane:
+  statefulSet:
+    persistence:
+      volumeClaim:
+        storageClass: standard
+  distro:
+    k8s:
+      enabled: true
+
+  proxy:
+    bindAddress: "0.0.0.0"
+    port: 8443
+    extraSANs:
+      - "maverick.tiab.labda.sva.de"
+      - "10.100.136.150"
+      - "localhost"  # Add for local access
+
+  service:
+    enabled: true
+    spec:
+      type: NodePort
+      ports:
+        - name: https
+          port: 443
+          targetPort: 8443
+          nodePort: 32443
+          protocol: TCP
+
+exportKubeConfig:
+  server: "https://10.100.136.150:32443"
+  # Or use hostname:
+  # server: "https://maverick.tiab.labda.sva.de:32443"
+```
+
+```bash
+# INSTALL
+helm repo add loft https://charts.loft.sh && \
+helm repo udpate
+
+helm upgrade --install xplane  \
+loft/vcluster --version 0.29.0  \
+--create-namespace -n vcluster  \
+--values vcluster.yaml
+```
+
+
+</details>
+
+
+<details><summary>DESTROY CLUSTER</summary>
 
 ```bash
 # DELETE

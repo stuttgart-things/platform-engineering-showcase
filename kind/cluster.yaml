@@ -1,0 +1,43 @@
+---
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: 0.0.0.0
+  disableDefaultCNI: true
+  kubeProxyMode: none
+name: platform-cluster
+featureGates:
+  ImageVolume: true
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.34.0
+    extraPortMappings:
+      - containerPort: 6443
+        hostPort: 31643
+        protocol: TCP
+      - containerPort: 32443
+        hostPort: 32443
+      - containerPort: 32444
+        hostPort: 32444
+      - containerPort: 32445
+        hostPort: 32445
+      - containerPort: 32446
+        hostPort: 32446
+      - containerPort: 32447
+        hostPort: 32447
+      - containerPort: 32448
+        hostPort: 32448
+  - role: worker
+    image: kindest/node:v1.34.0
+    extraMounts:
+      - hostPath: /mnt/platform-cluster1  # Host directory to mount
+        containerPath: /data              # Mount path inside the KinD node
+  - role: worker
+    image: kindest/node:v1.34.0
+    extraMounts:
+      - hostPath: /mnt/platform-cluster2  # Host directory to mount
+        containerPath: /data              # Mount path inside the KinD node
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+      endpoint = ["https://docker.harbor.idp.kubermatic.sva.dev", "https://registry-1.docker.io"]
