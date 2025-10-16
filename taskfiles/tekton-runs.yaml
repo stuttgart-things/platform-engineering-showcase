@@ -1,6 +1,5 @@
 ---
 version: "3"
-
 vars:
   KUBECONFIG_FOLDER: ~/.kube
   KCL_ANSIBLE_PR_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-tekton-pr
@@ -10,14 +9,42 @@ vars:
   ALL_ANSIBLE_COLLECTIONS: "community.crypto:2.22.3,community.general:10.1.0,ansible.posix:2.0.0,kubernetes.core:5.0.0,community.docker:4.1.0,community.vmware:5.2.0,awx.awx:24.6.1,community.hashi_vault:6.2.0,ansible.netcommon:7.1.0,https://github.com/stuttgart-things/ansible/releases/download/sthings-container-25.0.286.tar.gz/sthings-container-25.0.286.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-baseos-25.6.990.tar.gz/sthings-baseos-25.6.990.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-awx-25.4.506.tar.gz/sthings-awx-25.4.506.tar.gz,https://github.com/stuttgart-things/ansible/releases/download/sthings-rke-25.6.394.tar.gz/sthings-rke-25.6.394.tar.gz"
 
 tasks:
+  create:buildah:pipelinerun:
+    desc: Run buildah build
+    vars:
+      EXPORT_CMD_KUBECONFIG:
+        sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
+    cmds:
+      - |
+        {{ .EXPORT_CMD_KUBECONFIG }}
+        kubectl get nodes
+
+        # Ask for StorageClass
+        SELECTED_SC=$(kubectl get sc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the StorageClass to use for provisioning volumes")
+        echo "Selected StorageClass: ${SELECTED_SC}"
+
+        OUTPUT_FILE="/tmp/buildah-pr.yaml"
+
+        kcl run oci://ghcr.io/stuttgart-things/kcl-tekton-buildah -D --quiet \
+        | tee "${OUTPUT_FILE}"
+
+        cat "${OUTPUT_FILE}"
+
+        #gitUrl=https://github.com/stuttgart-things/stage-time \
+        #-D branchName=main \
+        #-D context=tests/test-app \
+        #-D verifySsl='"true"'
+
+#        | kubectl -n tekton-ci apply -f -
+
+
   create:ansible:pipelinerun:
     desc: Run ansible playbook to prepare base OS
     vars:
-      SELECTED_KUBECONFIG:
+      EXPORT_CMD_KUBECONFIG:
         sh: task --taskfile tekton-runs.yaml kube | grep '^export KUBECONFIG' | tail -n1
       INVENTORY:
         sh: task --taskfile tekton-runs.yaml build:ansible:inventory
-      NAME: horscht
       PLAYBOOKS:
         sh: task --taskfile tekton-runs.yaml listitems={{ .ALL_ANSIBLE_PLAYBOOKS }} pr:select:list
       COLLECTIONS:
@@ -28,7 +55,7 @@ tasks:
       - |
         echo ""  # Just to show the selected playbooks
 
-        {{ .SELECTED_KUBECONFIG }}
+        {{ .EXPORT_CMD_KUBECONFIG }}
         kubectl get nodes
 
         # Ask for StorageClass
@@ -50,7 +77,7 @@ tasks:
         # Run KCL pipeline and save to file
         OUTPUT_FILE="/tmp/pipelinerun.yaml"
         echo "Generating Tekton PipelineRun manifest with KCL..."
-        kcl run --quiet {{.KCL_ANSIBLE_PR_PACKAGE}}:{{.KCL_ANSIBLE_PR_VERSION}} \
+        kcl run --quiet {{ .KCL_ANSIBLE_PR_PACKAGE }}:{{ .KCL_ANSIBLE_PR_VERSION }} \
           -D ansibleWorkingImage="${ANSIBLE_IMAGE}" \
           -D storageClass="${SELECTED_SC}" \
           -D pipelinePrefix="${PIPELINE_PREFIX}" \
@@ -118,11 +145,11 @@ tasks:
     desc: Select kubeconfig
     cmds:
       - |
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }} --header "Select the Kubeconfig to use")
-        echo SWITCHING TO ${SELECTED_KUBECONFIG//\"/}
-        export KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${SELECTED_KUBECONFIG//\"/}
+        EXPORT_CMD_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }} --header "Select the Kubeconfig to use")
+        echo SWITCHING TO ${EXPORT_CMD_KUBECONFIG//\"/}
+        export KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${EXPORT_CMD_KUBECONFIG//\"/}
         kubectl get nodes
-        printf "\n\nexport KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${SELECTED_KUBECONFIG//\"/}\n\n"
+        printf "\n\nexport KUBECONFIG={{ .KUBECONFIG_FOLDER }}/${EXPORT_CMD_KUBECONFIG//\"/}\n\n"
     vars:
       ALL_KUBECONFIGS:
         sh: ls {{ .KUBECONFIG_FOLDER }} | xargs -n1 printf '"%s" '
