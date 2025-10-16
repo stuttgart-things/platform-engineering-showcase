@@ -90,3 +90,8 @@ tasks:
 
         exit 0
     silent: false
+
+  check:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - pre-commit run -a
