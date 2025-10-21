@@ -1,0 +1,271 @@
+version: '3'
+
+vars:
+  SCRIPT_DIR: scripts
+
+tasks:
+  export:
+    desc: "Export operations for air-gapped environments"
+    cmds:
+      - |
+        CHOICE=$(gum choose \
+          "container-images" \
+          "apk-packages" \
+          "pip-packages" \
+          "helm-chart" \
+          --header "Choose Export Operation:")
+        case $CHOICE in
+          "container-images")
+            task export:container-images
+            ;;
+          "apk-packages")
+            task export:apk-packages
+            ;;
+          "pip-packages")
+            task export:pip-packages
+            ;;
+          "helm-chart")
+            task export:helm-chart
+            ;;
+        esac
+
+  export:container-images:
+    desc: "Export container images as tar archives"
+    interactive: true
+    cmds:
+      - |
+        echo "📦 Export Container Images"
+        IMAGES=$(gum input --placeholder "Enter images (comma-separated, e.g. python:3.13.7-alpine,redis)")
+        RUNTIME=$(gum choose "docker" "podman" --header "Select container runtime:")
+        OUTPUT_DIR=$(gum input --placeholder "Output directory" --value "/tmp")
+        ARCHIVE_NAME=$(gum input --placeholder "Archive name" --value "container_images")
+
+        echo "Exporting images: $IMAGES"
+        sh {{.SCRIPT_DIR}}/export-container-images.sh \
+          --images "$IMAGES" \
+          --runtime "$RUNTIME" \
+          --output-dir "$OUTPUT_DIR" \
+          --archive-name "$ARCHIVE_NAME"
+
+  export:apk-packages:
+    desc: "Export APK packages from Alpine image"
+    interactive: true
+    cmds:
+      - |
+        echo "📦 Export APK Packages"
+        IMAGE=$(gum input --placeholder "Base image" --value "alpine:3.20")
+        PACKAGES=$(gum input --placeholder "APK packages (comma-separated, e.g. bash,curl,git)")
+        RUNTIME=$(gum choose "docker" "podman" --header "Select container runtime:")
+        OUTPUT_DIR=$(gum input --placeholder "Output directory" --value "/tmp")
+        ARCHIVE_NAME=$(gum input --placeholder "Archive name" --value "apk_packages")
+
+        echo "Exporting APK packages: $PACKAGES from $IMAGE"
+        sh {{.SCRIPT_DIR}}/export-apk-packages.sh \
+          --image "$IMAGE" \
+          --apk-packages "$PACKAGES" \
+          --runtime "$RUNTIME" \
+          --output-dir "$OUTPUT_DIR" \
+          --archive-name "$ARCHIVE_NAME"
+
+  export:pip-packages:
+    desc: "Export Python PIP packages"
+    interactive: true
+    cmds:
+      - |
+        echo "🐍 Export PIP Packages"
+        IMAGE=$(gum input --placeholder "Python image" --value "python:3.13.7-alpine")
+        PACKAGES=$(gum input --placeholder "PIP packages (comma-separated, e.g. flask,requests,sqlalchemy)")
+        RUNTIME=$(gum choose "docker" "podman" --header "Select container runtime:")
+        OUTPUT_DIR=$(gum input --placeholder "Output directory" --value "/tmp")
+        ARCHIVE_NAME=$(gum input --placeholder "Archive name" --value "pip_packages")
+
+        echo "Exporting PIP packages: $PACKAGES from $IMAGE"
+        sh {{.SCRIPT_DIR}}/export-pip-packages.sh \
+          --image "$IMAGE" \
+          --pip-packages "$PACKAGES" \
+          --runtime "$RUNTIME" \
+          --output-dir "$OUTPUT_DIR" \
+          --archive-name "$ARCHIVE_NAME"
+
+  export:helm-chart:
+    desc: "Download and export Helm chart"
+    interactive: true
+    cmds:
+      - |
+        echo "⎈ Export Helm Chart"
+        REPO_TYPE=$(gum choose "Chart Repository" "OCI Repository" --header "Select repository type:")
+
+        case $REPO_TYPE in
+          "Chart Repository")
+            REPO_NAME=$(gum input --placeholder "Repository name" --value "kyverno")
+            REPO_URL=$(gum input --placeholder "Repository URL" --value "https://kyverno.github.io/kyverno/")
+            CHART_NAME=$(gum input --placeholder "Chart name" --value "kyverno")
+            VERSION=$(gum input --placeholder "Chart version" --value "3.5.1")
+
+            echo "Adding helm repo and pulling chart..."
+            helm repo add "$REPO_NAME" "$REPO_URL"
+            helm pull "$REPO_NAME/$CHART_NAME" --version "$VERSION"
+            ;;
+          "OCI Repository")
+            OCI_URL=$(gum input --placeholder "OCI URL" --value "oci://ghcr.io/stuttgart-things/tekton/tekton")
+            VERSION=$(gum input --placeholder "Chart version" --value "0.77.0")
+
+            echo "Pulling OCI chart..."
+            helm pull "$OCI_URL" --version "$VERSION"
+            ;;
+        esac
+
+  import:
+    desc: "Import operations for air-gapped environments"
+    cmds:
+      - |
+        CHOICE=$(gum choose \
+          "container-images" \
+          "packages" \
+          --header "Choose Import Operation:")
+        case $CHOICE in
+          "container-images")
+            task import:container-images
+            ;;
+          "packages")
+            task import:packages
+            ;;
+        esac
+
+  import:container-images:
+    desc: "Import container images from tar archives"
+    interactive: true
+    cmds:
+      - |
+        echo "📥 Import Container Images"
+        RUNTIME=$(gum choose "docker" "podman" --header "Select container runtime:")
+        INPUT_DIR=$(gum input --placeholder "Input directory" --value "/tmp")
+        ARCHIVE_NAME=$(gum input --placeholder "Archive name" --value "container_images")
+
+        echo "Importing images from archive: $ARCHIVE_NAME"
+        sh {{.SCRIPT_DIR}}/import-container-images.sh \
+          --runtime "$RUNTIME" \
+          --input-dir "$INPUT_DIR" \
+          --archive-name "$ARCHIVE_NAME"
+
+  import:packages:
+    desc: "Import APK or PIP packages"
+    interactive: true
+    cmds:
+      - |
+        echo "📥 Import Packages"
+        ZIP_PATH=$(gum input --placeholder "ZIP file path" --value "/tmp/packages.zip")
+        PVC_PATH=$(gum input --placeholder "PVC mount path" --value "/mnt/pvc")
+        FORCE=$(gum confirm --default=false "Force overwrite existing files?")
+
+        FORCE_FLAG=""
+        if [ "$FORCE" = "true" ]; then
+          FORCE_FLAG="--force"
+        fi
+
+        echo "Importing packages from: $ZIP_PATH"
+        sh {{.SCRIPT_DIR}}/import-packages.sh \
+          --zip-path "$ZIP_PATH" \
+          --pvc-path "$PVC_PATH" \
+          $FORCE_FLAG
+
+  analyze:
+    desc: "Analyze operations to discover images and dependencies"
+    cmds:
+      - |
+        CHOICE=$(gum choose \
+          "project-directory" \
+          "k8s-namespace" \
+          "helm-chart" \
+          --header "Choose Analysis Operation:")
+        case $CHOICE in
+          "project-directory")
+            task analyze:project
+            ;;
+          "k8s-namespace")
+            task analyze:namespace
+            ;;
+          "helm-chart")
+            task analyze:helm-chart
+            ;;
+        esac
+
+  analyze:project:
+    desc: "Analyze project directory structure"
+    interactive: true
+    cmds:
+      - |
+        echo "🔍 Analyze Project Directory"
+        PROJECT_DIR=$(gum input --placeholder "Project directory" --value "_example")
+
+        echo "Analyzing project directory: $PROJECT_DIR"
+        sh {{.SCRIPT_DIR}}/analyze-project-dir.sh --dir "$PROJECT_DIR"
+
+  analyze:namespace:
+    desc: "Analyze images from Kubernetes namespace"
+    interactive: true
+    cmds:
+      - |
+        echo "🔍 Analyze K8s Namespace Images"
+        NAMESPACE=$(gum input --placeholder "Kubernetes namespace" --value "tekton-operator")
+
+        echo "Analyzing images in namespace: $NAMESPACE"
+        sh {{.SCRIPT_DIR}}/analyze-images-namespace.sh --namespace "$NAMESPACE"
+
+  analyze:helm-chart:
+    desc: "Analyze Helm chart for container images"
+    interactive: true
+    cmds:
+      - |
+        echo "🔍 Analyze Helm Chart"
+        CHART_NAME=$(gum input --placeholder "Chart name" --value "kyverno")
+        CHART_URL=$(gum input --placeholder "Chart URL" --value "kyverno/kyverno")
+        VERSION=$(gum input --placeholder "Chart version" --value "3.5.1")
+        REPO_NAME=$(gum input --placeholder "Repository name" --value "kyverno")
+        REPO_URL=$(gum input --placeholder "Repository URL" --value "https://kyverno.github.io/kyverno/")
+
+        echo "Adding repository and analyzing chart..."
+        helm repo add "$REPO_NAME" "$REPO_URL"
+        sh {{.SCRIPT_DIR}}/analyze-helm-chart.sh \
+          --name "$CHART_NAME" \
+          --charturl "$CHART_URL" \
+          --version "$VERSION"
+
+  menu:
+    desc: "Interactive menu for all operations"
+    cmds:
+      - |
+        echo "🚀 Platform Engineering Showcase - Image Build Mirrors"
+        echo ""
+        OPERATION=$(gum choose \
+          "Export (Internet-facing)" \
+          "Import (Air-gapped)" \
+          "Analyze" \
+          "Exit" \
+          --header "Select operation category:")
+
+        case $OPERATION in
+          "Export (Internet-facing)")
+            task export
+            ;;
+          "Import (Air-gapped)")
+            task import
+            ;;
+          "Analyze")
+            task analyze
+            ;;
+          "Exit")
+            echo "👋 Goodbye!"
+            exit 0
+            ;;
+        esac
+
+  default:
+    desc: "Run interactive menu"
+    cmds:
+      - task menu
+
+  help:
+    desc: "Show available tasks"
+    cmds:
+      - task --list
