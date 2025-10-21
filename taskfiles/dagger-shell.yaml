@@ -1,0 +1,95 @@
+---
+version: "3"
+vars:
+  BASE_IMAGE:
+    sh: |
+      choice=$(gum choose --header="Choose base image:" "cgr.dev/chainguard/wolfi-base" "alpine" "ubuntu:22.04" "debian:bookworm" "fedora:latest" "ENTER CUSTOM IMAGE")
+      if [ "$choice" = "ENTER CUSTOM IMAGE" ]; then
+        gum input --placeholder="Enter image (e.g., ubuntu:22.04)"
+      else
+        echo "$choice"
+      fi
+  ADD_PACKAGES:
+    sh: |
+      gum confirm "Do you want to add packages?" && echo "yes" || echo "no"
+  PACKAGE_MANAGER:
+    sh: |
+      if [ "{{.ADD_PACKAGES}}" = "yes" ]; then
+        choice=$(gum choose --header="Choose package manager:" "apk add" "apt-get update && apt-get install -y" "dnf install -y" "yum install -y" "ENTER CUSTOM CMD")
+        if [ "$choice" = "ENTER CUSTOM CMD" ]; then
+          gum input --placeholder="Enter install command (e.g., apt install -y)"
+        else
+          echo "$choice"
+        fi
+      fi
+  PACKAGES:
+    sh: |
+      if [ "{{.ADD_PACKAGES}}" = "yes" ]; then
+        selected=$(gum choose --no-limit --header="Choose packages (space to select, enter to confirm):" "curl" "git" "vim" "htop" "wget" "bash" "jq" "make" "gcc" "python3" "nodejs" "go" "ENTER CUSTOM PACKAGES" | tr '\n' ' ')
+
+        if echo "$selected" | grep -q "ENTER CUSTOM PACKAGES"; then
+          # Remove "ENTER CUSTOM PACKAGES" from the list
+          predefined=$(echo "$selected" | sed 's/ENTER CUSTOM PACKAGES//g' | xargs)
+          custom=$(gum input --placeholder="Enter additional packages (space-separated)")
+
+          if [ -n "$predefined" ] && [ -n "$custom" ]; then
+            echo "$predefined $custom"
+          elif [ -n "$custom" ]; then
+            echo "$custom"
+          else
+            echo "$predefined"
+          fi
+        else
+          echo "$selected"
+        fi
+      fi
+
+tasks:
+  run-terminal:
+    desc: Run dagger terminal with optional packages
+    cmds:
+      - |
+        {{if .PACKAGES}}
+        dagger -c 'container | from {{.BASE_IMAGE}} | with-exec {{.PACKAGE_MANAGER}} {{.PACKAGES}} | terminal'
+        {{else}}
+        dagger -c 'container | from {{.BASE_IMAGE}} | terminal'
+        {{end}}
+
+  publish-image:
+    desc: Build and publish container image
+    vars:
+      REGISTRY:
+        sh: |
+          choice=$(gum choose --header="Choose registry:" "ttl.sh" "docker.io" "ghcr.io" "gcr.io" "Enter custom registry")
+          if [ "$choice" = "Enter custom registry" ]; then
+            gum input --placeholder="Enter registry (e.g., registry.example.com)"
+          else
+            echo "$choice"
+          fi
+      REPOSITORY:
+        sh: |
+          gum input --placeholder="Enter repository name" --value="stuttgart-things"
+      IMAGE_NAME:
+        sh: |
+          # Extract image name from BASE_IMAGE (remove registry and keep only last part)
+          base_image="{{.BASE_IMAGE}}"
+          # Remove tag/digest if present
+          image_without_tag="${base_image%%:*}"
+          image_without_digest="${image_without_tag%%@*}"
+          # Get last component (image name)
+          default_name=$(basename "$image_without_digest")
+          gum input --placeholder="Enter image name" --value="$default_name"
+      IMAGE_TAG:
+        sh: |
+          default_tag=$(date +%Y%m%d-%H%M%S)
+          gum input --placeholder="Enter image tag" --value="$default_tag"
+    cmds:
+      - |
+        IMAGE_REF="{{.REGISTRY}}/{{.REPOSITORY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}}"
+        echo "Publishing to: $IMAGE_REF"
+        {{if .PACKAGES}}
+        dagger -c "container | from {{.BASE_IMAGE}} | with-exec {{.PACKAGE_MANAGER}} {{.PACKAGES}} | publish $IMAGE_REF"
+        {{else}}
+        dagger -c "container | from {{.BASE_IMAGE}} | publish $IMAGE_REF"
+        {{end}}
+        echo "✅ Image published: $IMAGE_REF"
