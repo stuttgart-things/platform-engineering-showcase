@@ -244,7 +244,7 @@ tasks:
             ;;
 
           "Save to file")
-            DEFAULT_OUTPUT_FILE="${CLUSTER_NAME}-flux-instance.yaml"
+            DEFAULT_OUTPUT_FILE="/tmp/${CLUSTER_NAME}-flux-instance.yaml"
             OUTPUT_FILE=$(gum input --value "${DEFAULT_OUTPUT_FILE}" --prompt "Output file path? " --placeholder "${DEFAULT_OUTPUT_FILE}")
             echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
 
