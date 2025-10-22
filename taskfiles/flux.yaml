@@ -34,7 +34,9 @@ tasks:
         # Git Sync Configuration
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Git Sync Configuration"
-        GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL? " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")        if [ -z "${GIT_URL}" ]; then
+        GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL? " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")
+        
+        if [ -z "${GIT_URL}" ]; then
           echo "❌ Git URL is required!"
           exit 1
         fi
