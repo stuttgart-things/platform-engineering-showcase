@@ -185,8 +185,11 @@ tasks:
           if [ "${SOPS_ENABLED}" = "true" ] && [ -n "${SOPS_AGE_KEY_VALUE}" ]; then
             KCL_CMD="${KCL_CMD} -D sopsAgeKey=${SOPS_AGE_KEY_VALUE}"
           fi
-        fi        # Execute KCL and store output
-        RENDERED_OUTPUT=$(${KCL_CMD} | grep -A 1000 "^items:")
+        fi
+
+        # Execute KCL and store output with proper YAML formatting
+        # Remove 'items:' line, replace list markers with document separators, remove leading spaces
+        RENDERED_OUTPUT=$(${KCL_CMD} --format yaml | grep -A 1000 "^items:" | grep -v "^items:" | sed 's/^- /---\n/' | sed 's/^  //' | sed '1d')
 
         # Show preview
         echo ""
@@ -241,7 +244,8 @@ tasks:
             ;;
 
           "Save to file")
-            OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
+            DEFAULT_OUTPUT_FILE="${CLUSTER_NAME}-flux-instance.yaml"
+            OUTPUT_FILE=$(gum input --value "${DEFAULT_OUTPUT_FILE}" --prompt "Output file path? " --placeholder "${DEFAULT_OUTPUT_FILE}")
             echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
 
             echo ""
