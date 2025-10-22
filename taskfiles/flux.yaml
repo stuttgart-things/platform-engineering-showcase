@@ -4,7 +4,7 @@ version: "3"
 vars:
   KUBECONFIG_FOLDER: ~/.kube
   FLUX_INSTANCE_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-flux-instance
-  FLUX_INSTANCE_VERSION: "0.1.1"
+  FLUX_INSTANCE_VERSION: "0.2.0"
   DEFAULT_FLUX_VERSION: "2.4"
   DEFAULT_NAMESPACE: flux-system
   DEFAULT_CONCURRENT: "10"
@@ -58,6 +58,24 @@ tasks:
           SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name? " --placeholder "sops-age")
         fi
 
+        # Secret Rendering
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Kubernetes Secrets"
+        RENDER_SECRETS=$(gum choose --header "Render Kubernetes Secrets?" "false" "true")
+
+        if [ "${RENDER_SECRETS}" = "true" ]; then
+          echo ""
+          gum style --foreground 212 "📝 Git Authentication Secret"
+          GIT_USERNAME=$(gum input --prompt "Git username? " --placeholder "github-user")
+          GIT_PASSWORD=$(gum input --password --prompt "Git password/token? " --placeholder "ghp_...")
+
+          if [ "${SOPS_ENABLED}" = "true" ]; then
+            echo ""
+            gum style --foreground 212 "🔐 SOPS Decryption Secret"
+            SOPS_AGE_KEY=$(gum input --password --prompt "SOPS AGE private key? " --placeholder "AGE-SECRET-KEY-1...")
+          fi
+        fi
+
         # Performance Settings
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Performance Settings"
@@ -87,6 +105,7 @@ tasks:
         echo "Git URL:             ${GIT_URL}"
         echo "Git Path:            ${GIT_PATH}"
         echo "SOPS Enabled:        ${SOPS_ENABLED}"
+        echo "Render Secrets:      ${RENDER_SECRETS}"
         echo "Concurrent:          ${CONCURRENT}"
         echo "Multitenant:         ${MULTITENANT}"
         echo "Network Policy:      ${NETWORK_POLICY}"
@@ -120,6 +139,17 @@ tasks:
         KCL_CMD="${KCL_CMD} -D domain=${DOMAIN}"
         KCL_CMD="${KCL_CMD} -D reconcileEvery=${RECONCILE_EVERY}"
         KCL_CMD="${KCL_CMD} -D reconcileTimeout=${RECONCILE_TIMEOUT}"
+
+        # Add secret rendering parameters
+        if [ "${RENDER_SECRETS}" = "true" ]; then
+          KCL_CMD="${KCL_CMD} -D renderSecrets=true"
+          KCL_CMD="${KCL_CMD} -D gitUsername=${GIT_USERNAME}"
+          KCL_CMD="${KCL_CMD} -D gitPassword=${GIT_PASSWORD}"
+
+          if [ "${SOPS_ENABLED}" = "true" ] && [ -n "${SOPS_AGE_KEY}" ]; then
+            KCL_CMD="${KCL_CMD} -D sopsAgeKey=${SOPS_AGE_KEY}"
+          fi
+        fi
 
         # Execute KCL and store output
         RENDERED_OUTPUT=$(${KCL_CMD} | grep -A 1000 "^items:")
