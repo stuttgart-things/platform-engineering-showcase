@@ -34,18 +34,20 @@ tasks:
         # Git Sync Configuration
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Git Sync Configuration"
+
+        # Ask for cluster name first
+        CLUSTER_NAME=$(gum input --value "production" --prompt "Cluster name? " --placeholder "production")
+
         GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL? " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")
-        
+
         if [ -z "${GIT_URL}" ]; then
           echo "❌ Git URL is required!"
           exit 1
         fi
 
         GIT_REF=$(gum input --value "refs/heads/main" --prompt "Git reference? " --placeholder "refs/heads/main")
-        GIT_PATH=$(gum input --value "clusters/production" --prompt "Path in repository? " --placeholder "clusters/production")
-        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git pull secret name? " --placeholder "git-token-auth")
-
-        # SOPS Configuration
+        GIT_PATH=$(gum input --value "clusters/${CLUSTER_NAME}" --prompt "Path in repository? " --placeholder "clusters/${CLUSTER_NAME}")
+        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git pull secret name? " --placeholder "git-token-auth")        # SOPS Configuration
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "SOPS Configuration"
         SOPS_ENABLED=$(gum choose --header "Enable SOPS decryption?" "true" "false")
@@ -79,6 +81,7 @@ tasks:
         echo "Name:                ${NAME}"
         echo "Namespace:           ${NAMESPACE}"
         echo "Version:             ${VERSION}"
+        echo "Cluster:             ${CLUSTER_NAME}"
         echo "Git URL:             ${GIT_URL}"
         echo "Git Path:            ${GIT_PATH}"
         echo "SOPS Enabled:        ${SOPS_ENABLED}"
@@ -299,6 +302,9 @@ tasks:
         # Fixed name
         NAME="flux"
 
+        # Ask for cluster name
+        CLUSTER_NAME=$(gum input --value "production" --prompt "Cluster name: " --placeholder "production")
+
         GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL: " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")
 
         if [ -z "${GIT_URL}" ]; then
@@ -306,11 +312,12 @@ tasks:
           exit 1
         fi
 
-        GIT_PATH=$(gum input --value "clusters/production" --prompt "Path in repository: " --placeholder "clusters/production")
+        GIT_PATH=$(gum input --value "clusters/${CLUSTER_NAME}" --prompt "Path in repository: " --placeholder "clusters/${CLUSTER_NAME}")
 
         echo ""
         gum style --border double --padding "1 2" --border-foreground 57 "Using production defaults:"
         echo "  - Name: flux"
+        echo "  - Cluster: ${CLUSTER_NAME}"
         echo "  - SOPS enabled"
         echo "  - NetworkPolicy enabled"
         echo "  - Concurrent: 10"
