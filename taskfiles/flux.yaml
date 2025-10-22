@@ -1,0 +1,320 @@
+---
+version: "3"
+
+vars:
+  KUBECONFIG_FOLDER: ~/.kube
+  FLUX_INSTANCE_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-flux-instance
+  FLUX_INSTANCE_VERSION: "0.1.1"
+  DEFAULT_FLUX_VERSION: "2.4"
+  DEFAULT_NAMESPACE: flux-system
+  DEFAULT_CONCURRENT: "10"
+  DEFAULT_REQUEUE_DEPENDENCY: "5s"
+
+tasks:
+  render:
+    desc: Render FluxInstance CR with interactive configuration
+    cmds:
+      - |
+        echo "🚀 FluxInstance Configuration"
+        echo "================================"
+        echo ""
+
+        # Basic Configuration
+        NAME=$(gum input --value "flux" --prompt "FluxInstance name? " --placeholder "flux")
+        NAMESPACE=$(gum input --value "{{.DEFAULT_NAMESPACE}}" --prompt "Namespace? " --placeholder "{{.DEFAULT_NAMESPACE}}")
+
+        # Distribution Settings
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Distribution Settings"
+        VERSION=$(gum input --value "{{.DEFAULT_FLUX_VERSION}}" --prompt "Flux version? " --placeholder "{{.DEFAULT_FLUX_VERSION}}")
+        REGISTRY=$(gum input --value "ghcr.io/fluxcd" --prompt "Container registry? " --placeholder "ghcr.io/fluxcd")
+
+        # Git Sync Configuration
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Git Sync Configuration"
+        GIT_URL=$(gum input --prompt "Git repository URL? " --placeholder "https://github.com/your-org/your-repo.git")
+
+        if [ -z "${GIT_URL}" ]; then
+          echo "❌ Git URL is required!"
+          exit 1
+        fi
+
+        GIT_REF=$(gum input --value "refs/heads/main" --prompt "Git reference? " --placeholder "refs/heads/main")
+        GIT_PATH=$(gum input --value "clusters/production" --prompt "Path in repository? " --placeholder "clusters/production")
+        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git pull secret name? " --placeholder "git-token-auth")
+
+        # SOPS Configuration
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "SOPS Configuration"
+        SOPS_ENABLED=$(gum choose --header "Enable SOPS decryption?" "true" "false")
+
+        if [ "${SOPS_ENABLED}" = "true" ]; then
+          SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name? " --placeholder "sops-age")
+        fi
+
+        # Performance Settings
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Performance Settings"
+        CONCURRENT=$(gum input --value "{{.DEFAULT_CONCURRENT}}" --prompt "Concurrent reconciliations? " --placeholder "{{.DEFAULT_CONCURRENT}}")
+        REQUEUE_DEPENDENCY=$(gum input --value "{{.DEFAULT_REQUEUE_DEPENDENCY}}" --prompt "Requeue dependency interval? " --placeholder "{{.DEFAULT_REQUEUE_DEPENDENCY}}")
+
+        # Cluster Settings
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Cluster Settings"
+        MULTITENANT=$(gum choose --header "Enable multitenant mode?" "false" "true")
+        NETWORK_POLICY=$(gum choose --header "Enable NetworkPolicy?" "true" "false")
+        DOMAIN=$(gum input --value "cluster.local" --prompt "Cluster domain? " --placeholder "cluster.local")
+
+        # Reconciliation Settings
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Reconciliation Settings"
+        RECONCILE_EVERY=$(gum input --value "1h" --prompt "Reconcile interval? " --placeholder "1h")
+        RECONCILE_TIMEOUT=$(gum input --value "5m" --prompt "Reconcile timeout? " --placeholder "5m")
+
+        # Output Configuration
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Output Configuration"
+        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
+
+        # Summary
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 57 "Configuration Summary"
+        echo "Name:                ${NAME}"
+        echo "Namespace:           ${NAMESPACE}"
+        echo "Version:             ${VERSION}"
+        echo "Git URL:             ${GIT_URL}"
+        echo "Git Path:            ${GIT_PATH}"
+        echo "SOPS Enabled:        ${SOPS_ENABLED}"
+        echo "Concurrent:          ${CONCURRENT}"
+        echo "Multitenant:         ${MULTITENANT}"
+        echo "Network Policy:      ${NETWORK_POLICY}"
+        echo "Output:              ${OUTPUT_FILE}"
+        echo ""
+
+        gum confirm "Proceed with rendering FluxInstance?" || exit 0
+
+        # Build KCL command
+        echo ""
+        echo "📦 Rendering FluxInstance from OCI package..."
+
+        KCL_CMD="kcl run {{.FLUX_INSTANCE_PACKAGE}} --tag {{.FLUX_INSTANCE_VERSION}}"
+        KCL_CMD="${KCL_CMD} -D name=${NAME}"
+        KCL_CMD="${KCL_CMD} -D namespace=${NAMESPACE}"
+        KCL_CMD="${KCL_CMD} -D version=${VERSION}"
+        KCL_CMD="${KCL_CMD} -D registry=${REGISTRY}"
+        KCL_CMD="${KCL_CMD} -D gitUrl=${GIT_URL}"
+        KCL_CMD="${KCL_CMD} -D gitRef=${GIT_REF}"
+        KCL_CMD="${KCL_CMD} -D gitPath=${GIT_PATH}"
+        KCL_CMD="${KCL_CMD} -D gitPullSecret=${GIT_PULL_SECRET}"
+        KCL_CMD="${KCL_CMD} -D sopsEnabled=${SOPS_ENABLED}"
+
+        if [ "${SOPS_ENABLED}" = "true" ]; then
+          KCL_CMD="${KCL_CMD} -D sopsSecretName=${SOPS_SECRET}"
+        fi
+
+        KCL_CMD="${KCL_CMD} -D concurrent=${CONCURRENT}"
+        KCL_CMD="${KCL_CMD} -D requeueDependency=${REQUEUE_DEPENDENCY}"
+        KCL_CMD="${KCL_CMD} -D multitenant=${MULTITENANT}"
+        KCL_CMD="${KCL_CMD} -D networkPolicy=${NETWORK_POLICY}"
+        KCL_CMD="${KCL_CMD} -D domain=${DOMAIN}"
+        KCL_CMD="${KCL_CMD} -D reconcileEvery=${RECONCILE_EVERY}"
+        KCL_CMD="${KCL_CMD} -D reconcileTimeout=${RECONCILE_TIMEOUT}"
+
+        # Execute KCL and save output
+        ${KCL_CMD} | grep -A 1000 "^items:" | tee "${OUTPUT_FILE}"
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered successfully!"
+        echo "Output saved to: ${OUTPUT_FILE}"
+        echo ""
+
+        # Preview
+        if gum confirm "Preview the rendered YAML?"; then
+          cat "${OUTPUT_FILE}"
+        fi
+
+  apply:
+    desc: Render and apply FluxInstance to Kubernetes cluster
+    vars:
+      EXPORT_CMD_KUBECONFIG:
+        sh: |
+          KUBECONFIG_FILE=$(find {{.KUBECONFIG_FOLDER}} -type f | gum choose --header "Select kubeconfig")
+          echo "export KUBECONFIG=${KUBECONFIG_FILE}"
+    cmds:
+      - |
+        {{ .EXPORT_CMD_KUBECONFIG }}
+
+        echo "🎯 Selected cluster:"
+        kubectl cluster-info | head -1
+        echo ""
+
+        # Check if flux-system namespace exists
+        if ! kubectl get namespace flux-system >/dev/null 2>&1; then
+          echo "⚠️  flux-system namespace does not exist"
+          if gum confirm "Create flux-system namespace?"; then
+            kubectl create namespace flux-system
+            echo "✅ Created flux-system namespace"
+          fi
+        fi
+
+        # Render FluxInstance
+        task render
+
+        # Get the output file path
+        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Path to rendered FluxInstance? " --placeholder "/tmp/flux-instance.yaml")
+
+        if [ ! -f "${OUTPUT_FILE}" ]; then
+          echo "❌ File not found: ${OUTPUT_FILE}"
+          exit 1
+        fi
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Ready to apply FluxInstance"
+        echo "Cluster:  $(kubectl config current-context)"
+        echo "File:     ${OUTPUT_FILE}"
+        echo ""
+
+        if gum confirm "Apply FluxInstance to cluster?"; then
+          kubectl apply -f "${OUTPUT_FILE}"
+
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance applied!"
+          echo ""
+
+          # Show created resource
+          FLUX_NAME=$(grep "name:" "${OUTPUT_FILE}" | head -1 | awk '{print $2}')
+          FLUX_NAMESPACE=$(grep "namespace:" "${OUTPUT_FILE}" | head -1 | awk '{print $2}')
+
+          echo "Checking FluxInstance status..."
+          kubectl get fluxinstance -n "${FLUX_NAMESPACE}" "${FLUX_NAME}" || true
+
+          echo ""
+          echo "Monitor Flux deployment with:"
+          echo "  kubectl get pods -n ${FLUX_NAMESPACE} -w"
+        else
+          echo "❌ Deployment cancelled"
+        fi
+
+  delete:
+    desc: Delete FluxInstance from cluster
+    vars:
+      EXPORT_CMD_KUBECONFIG:
+        sh: |
+          KUBECONFIG_FILE=$(find {{.KUBECONFIG_FOLDER}} -type f | gum choose --header "Select kubeconfig")
+          echo "export KUBECONFIG=${KUBECONFIG_FILE}"
+    cmds:
+      - |
+        {{ .EXPORT_CMD_KUBECONFIG }}
+
+        echo "🎯 Selected cluster:"
+        kubectl cluster-info | head -1
+        echo ""
+
+        # List FluxInstances
+        echo "Available FluxInstances:"
+        kubectl get fluxinstance --all-namespaces
+        echo ""
+
+        # Select namespace
+        NAMESPACE=$(kubectl get fluxinstance --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' | sort -u | gum choose --header "Select namespace")
+
+        if [ -z "${NAMESPACE}" ]; then
+          echo "❌ No namespace selected"
+          exit 1
+        fi
+
+        # Select FluxInstance
+        FLUX_NAME=$(kubectl get fluxinstance -n "${NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select FluxInstance to delete")
+
+        if [ -z "${FLUX_NAME}" ]; then
+          echo "❌ No FluxInstance selected"
+          exit 1
+        fi
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 196 "⚠️  Deletion Confirmation"
+        echo "This will delete:"
+        echo "  FluxInstance: ${FLUX_NAME}"
+        echo "  Namespace:    ${NAMESPACE}"
+        echo "  Cluster:      $(kubectl config current-context)"
+        echo ""
+
+        if gum confirm "Are you sure you want to delete this FluxInstance?"; then
+          kubectl delete fluxinstance -n "${NAMESPACE}" "${FLUX_NAME}"
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance deleted"
+        else
+          echo "❌ Deletion cancelled"
+        fi
+
+  status:
+    desc: Check FluxInstance status in cluster
+    vars:
+      EXPORT_CMD_KUBECONFIG:
+        sh: |
+          KUBECONFIG_FILE=$(find {{.KUBECONFIG_FOLDER}} -type f | gum choose --header "Select kubeconfig")
+          echo "export KUBECONFIG=${KUBECONFIG_FILE}"
+    cmds:
+      - |
+        {{ .EXPORT_CMD_KUBECONFIG }}
+
+        echo "🎯 Cluster: $(kubectl config current-context)"
+        echo ""
+
+        gum style --border double --padding "1 2" --border-foreground 212 "FluxInstances"
+        kubectl get fluxinstance --all-namespaces
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Flux Pods"
+        kubectl get pods -n flux-system 2>/dev/null || echo "No flux-system namespace found"
+
+        echo ""
+        if gum confirm "Show detailed FluxInstance status?"; then
+          NAMESPACE=$(kubectl get fluxinstance --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' | sort -u | gum choose --header "Select namespace")
+
+          if [ -n "${NAMESPACE}" ]; then
+            FLUX_NAME=$(kubectl get fluxinstance -n "${NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select FluxInstance")
+
+            if [ -n "${FLUX_NAME}" ]; then
+              echo ""
+              gum style --border double --padding "1 2" --border-foreground 57 "FluxInstance Details"
+              kubectl describe fluxinstance -n "${NAMESPACE}" "${FLUX_NAME}"
+            fi
+          fi
+        fi
+
+  quick:
+    desc: Quick setup with minimal prompts (production defaults)
+    cmds:
+      - |
+        echo "🚀 Quick FluxInstance Setup"
+        echo ""
+
+        GIT_URL=$(gum input --prompt "Git repository URL (required): " --placeholder "https://github.com/your-org/your-repo.git")
+
+        if [ -z "${GIT_URL}" ]; then
+          echo "❌ Git URL is required!"
+          exit 1
+        fi
+
+        GIT_PATH=$(gum input --value "clusters/production" --prompt "Path in repository: " --placeholder "clusters/production")
+        NAME=$(gum input --value "flux" --prompt "FluxInstance name: " --placeholder "flux")
+        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file: " --placeholder "/tmp/flux-instance.yaml")
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 57 "Using production defaults:"
+        echo "  - SOPS enabled"
+        echo "  - NetworkPolicy enabled"
+        echo "  - Concurrent: 10"
+        echo "  - Version: {{.DEFAULT_FLUX_VERSION}}"
+        echo ""
+
+        kcl run {{.FLUX_INSTANCE_PACKAGE}} --tag {{.FLUX_INSTANCE_VERSION}} \
+          -D name=${NAME} \
+          -D gitUrl=${GIT_URL} \
+          -D gitPath=${GIT_PATH} \
+          | grep -A 1000 "^items:" | tee "${OUTPUT_FILE}"
+
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered!"
+        echo "Output: ${OUTPUT_FILE}"
