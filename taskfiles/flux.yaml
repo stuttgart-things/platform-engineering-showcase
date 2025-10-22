@@ -29,7 +29,7 @@ tasks:
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Distribution Settings"
         VERSION=$(gum input --value "{{.DEFAULT_FLUX_VERSION}}" --prompt "Flux version? " --placeholder "{{.DEFAULT_FLUX_VERSION}}")
-        REGISTRY=$(gum input --value "ghcr.io/fluxcd" --prompt "Container registry? " --placeholder "ghcr.io/fluxcd")
+        REGISTRY="ghcr.io/fluxcd"
 
         # Git Sync Configuration
         echo ""
@@ -47,7 +47,9 @@ tasks:
 
         GIT_REF=$(gum input --value "refs/heads/main" --prompt "Git reference? " --placeholder "refs/heads/main")
         GIT_PATH=$(gum input --value "clusters/${CLUSTER_NAME}" --prompt "Path in repository? " --placeholder "clusters/${CLUSTER_NAME}")
-        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git pull secret name? " --placeholder "git-token-auth")        # SOPS Configuration
+        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git SCM secret? " --placeholder "git-token-auth")
+
+        # SOPS Configuration
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "SOPS Configuration"
         SOPS_ENABLED=$(gum choose --header "Enable SOPS decryption?" "true" "false")
@@ -349,3 +351,10 @@ tasks:
           echo ""
           gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered (not saved)"
         fi
+
+  default:
+    desc: Select a task to run
+    cmds:
+      - |
+        task=$(yq e '.tasks | keys' flux.yaml  | sed 's/^- //' | gum choose)
+        task --taskfile flux.yaml ${task}
