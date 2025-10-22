@@ -19,8 +19,10 @@ tasks:
         echo "================================"
         echo ""
 
+        # Fixed name - always flux
+        NAME="flux"
+
         # Basic Configuration
-        NAME=$(gum input --value "flux" --prompt "FluxInstance name? " --placeholder "flux")
         NAMESPACE=$(gum input --value "{{.DEFAULT_NAMESPACE}}" --prompt "Namespace? " --placeholder "{{.DEFAULT_NAMESPACE}}")
 
         # Distribution Settings
@@ -32,9 +34,7 @@ tasks:
         # Git Sync Configuration
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Git Sync Configuration"
-        GIT_URL=$(gum input --prompt "Git repository URL? " --placeholder "https://github.com/your-org/your-repo.git")
-
-        if [ -z "${GIT_URL}" ]; then
+        GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL? " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")        if [ -z "${GIT_URL}" ]; then
           echo "❌ Git URL is required!"
           exit 1
         fi
@@ -71,11 +71,6 @@ tasks:
         RECONCILE_EVERY=$(gum input --value "1h" --prompt "Reconcile interval? " --placeholder "1h")
         RECONCILE_TIMEOUT=$(gum input --value "5m" --prompt "Reconcile timeout? " --placeholder "5m")
 
-        # Output Configuration
-        echo ""
-        gum style --border double --padding "1 2" --border-foreground 212 "Output Configuration"
-        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
-
         # Summary
         echo ""
         gum style --border double --padding "1 2" --border-foreground 57 "Configuration Summary"
@@ -88,7 +83,6 @@ tasks:
         echo "Concurrent:          ${CONCURRENT}"
         echo "Multitenant:         ${MULTITENANT}"
         echo "Network Policy:      ${NETWORK_POLICY}"
-        echo "Output:              ${OUTPUT_FILE}"
         echo ""
 
         gum confirm "Proceed with rendering FluxInstance?" || exit 0
@@ -120,18 +114,28 @@ tasks:
         KCL_CMD="${KCL_CMD} -D reconcileEvery=${RECONCILE_EVERY}"
         KCL_CMD="${KCL_CMD} -D reconcileTimeout=${RECONCILE_TIMEOUT}"
 
-        # Execute KCL and save output
-        ${KCL_CMD} | grep -A 1000 "^items:" | tee "${OUTPUT_FILE}"
+        # Execute KCL and store output
+        RENDERED_OUTPUT=$(${KCL_CMD} | grep -A 1000 "^items:")
 
+        # Show preview
         echo ""
-        gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered successfully!"
-        echo "Output saved to: ${OUTPUT_FILE}"
+        gum style --border double --padding "1 2" --border-foreground 212 "📄 Preview"
+        echo "${RENDERED_OUTPUT}"
         echo ""
 
-        # Preview
-        if gum confirm "Preview the rendered YAML?"; then
-          cat "${OUTPUT_FILE}"
+        # Ask to save
+        if gum confirm "Save to file?"; then
+          OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
+          echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
+
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance saved successfully!"
+          echo "Output saved to: ${OUTPUT_FILE}"
+        else
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered (not saved)"
         fi
+        echo ""
 
   apply:
     desc: Render and apply FluxInstance to Kubernetes cluster
@@ -290,7 +294,10 @@ tasks:
         echo "🚀 Quick FluxInstance Setup"
         echo ""
 
-        GIT_URL=$(gum input --prompt "Git repository URL (required): " --placeholder "https://github.com/your-org/your-repo.git")
+        # Fixed name
+        NAME="flux"
+
+        GIT_URL=$(gum input --value "https://github.com/stuttgart-things/stuttgart-things.git" --prompt "Git repository URL: " --placeholder "https://github.com/stuttgart-things/stuttgart-things.git")
 
         if [ -z "${GIT_URL}" ]; then
           echo "❌ Git URL is required!"
@@ -298,23 +305,38 @@ tasks:
         fi
 
         GIT_PATH=$(gum input --value "clusters/production" --prompt "Path in repository: " --placeholder "clusters/production")
-        NAME=$(gum input --value "flux" --prompt "FluxInstance name: " --placeholder "flux")
-        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file: " --placeholder "/tmp/flux-instance.yaml")
 
         echo ""
         gum style --border double --padding "1 2" --border-foreground 57 "Using production defaults:"
+        echo "  - Name: flux"
         echo "  - SOPS enabled"
         echo "  - NetworkPolicy enabled"
         echo "  - Concurrent: 10"
         echo "  - Version: {{.DEFAULT_FLUX_VERSION}}"
         echo ""
 
-        kcl run {{.FLUX_INSTANCE_PACKAGE}} --tag {{.FLUX_INSTANCE_VERSION}} \
+        # Render output
+        RENDERED_OUTPUT=$(kcl run {{.FLUX_INSTANCE_PACKAGE}} --tag {{.FLUX_INSTANCE_VERSION}} \
           -D name=${NAME} \
           -D gitUrl=${GIT_URL} \
           -D gitPath=${GIT_PATH} \
-          | grep -A 1000 "^items:" | tee "${OUTPUT_FILE}"
+          | grep -A 1000 "^items:")
 
+        # Show preview
         echo ""
-        gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered!"
-        echo "Output: ${OUTPUT_FILE}"
+        gum style --border double --padding "1 2" --border-foreground 212 "📄 Preview"
+        echo "${RENDERED_OUTPUT}"
+        echo ""
+
+        # Ask to save
+        if gum confirm "Save to file?"; then
+          OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
+          echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
+
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance saved!"
+          echo "Output: ${OUTPUT_FILE}"
+        else
+          echo ""
+          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered (not saved)"
+        fi
