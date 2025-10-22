@@ -25,6 +25,38 @@ tasks:
         # Basic Configuration
         NAMESPACE=$(gum input --value "{{.DEFAULT_NAMESPACE}}" --prompt "Namespace? " --placeholder "{{.DEFAULT_NAMESPACE}}")
 
+        # Secret Rendering - Ask first to set up references
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "Kubernetes Secrets"
+        RENDER_SECRETS=$(gum choose --header "Render Kubernetes Secrets?" "false" "true")
+
+        # Git Secret Configuration
+        if [ "${RENDER_SECRETS}" = "true" ]; then
+          echo ""
+          gum style --foreground 212 "📝 Git Authentication Secret"
+          GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git secret name? " --placeholder "git-token-auth")
+          GIT_USERNAME=$(gum input --prompt "Git username? " --placeholder "github-user")
+          GIT_PASSWORD=$(gum input --password --prompt "Git password/token? " --placeholder "ghp_...")
+        else
+          GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git secret name (existing)? " --placeholder "git-token-auth")
+        fi
+
+        # SOPS Configuration
+        echo ""
+        gum style --border double --padding "1 2" --border-foreground 212 "SOPS Configuration"
+        SOPS_ENABLED=$(gum choose --header "Enable SOPS decryption?" "true" "false")
+
+        if [ "${SOPS_ENABLED}" = "true" ]; then
+          if [ "${RENDER_SECRETS}" = "true" ]; then
+            echo ""
+            gum style --foreground 212 "🔐 SOPS Decryption Secret"
+            SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name? " --placeholder "sops-age")
+            SOPS_AGE_KEY=$(gum input --password --prompt "SOPS AGE private key? " --placeholder "AGE-SECRET-KEY-1...")
+          else
+            SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name (existing)? " --placeholder "sops-age")
+          fi
+        fi
+
         # Distribution Settings
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Distribution Settings"
@@ -47,34 +79,6 @@ tasks:
 
         GIT_REF=$(gum input --value "refs/heads/main" --prompt "Git reference? " --placeholder "refs/heads/main")
         GIT_PATH=$(gum input --value "clusters/${CLUSTER_NAME}" --prompt "Path in repository? " --placeholder "clusters/${CLUSTER_NAME}")
-        GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git SCM secret? " --placeholder "git-token-auth")
-
-        # SOPS Configuration
-        echo ""
-        gum style --border double --padding "1 2" --border-foreground 212 "SOPS Configuration"
-        SOPS_ENABLED=$(gum choose --header "Enable SOPS decryption?" "true" "false")
-
-        if [ "${SOPS_ENABLED}" = "true" ]; then
-          SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name? " --placeholder "sops-age")
-        fi
-
-        # Secret Rendering
-        echo ""
-        gum style --border double --padding "1 2" --border-foreground 212 "Kubernetes Secrets"
-        RENDER_SECRETS=$(gum choose --header "Render Kubernetes Secrets?" "false" "true")
-
-        if [ "${RENDER_SECRETS}" = "true" ]; then
-          echo ""
-          gum style --foreground 212 "📝 Git Authentication Secret"
-          GIT_USERNAME=$(gum input --prompt "Git username? " --placeholder "github-user")
-          GIT_PASSWORD=$(gum input --password --prompt "Git password/token? " --placeholder "ghp_...")
-
-          if [ "${SOPS_ENABLED}" = "true" ]; then
-            echo ""
-            gum style --foreground 212 "🔐 SOPS Decryption Secret"
-            SOPS_AGE_KEY=$(gum input --password --prompt "SOPS AGE private key? " --placeholder "AGE-SECRET-KEY-1...")
-          fi
-        fi
 
         # Performance Settings
         echo ""
@@ -100,12 +104,15 @@ tasks:
         gum style --border double --padding "1 2" --border-foreground 57 "Configuration Summary"
         echo "Name:                ${NAME}"
         echo "Namespace:           ${NAMESPACE}"
-        echo "Version:             ${VERSION}"
+        echo "Render Secrets:      ${RENDER_SECRETS}"
+        echo "Git Secret:          ${GIT_PULL_SECRET}"
+        if [ "${SOPS_ENABLED}" = "true" ]; then
+          echo "SOPS Secret:         ${SOPS_SECRET}"
+        fi
         echo "Cluster:             ${CLUSTER_NAME}"
         echo "Git URL:             ${GIT_URL}"
         echo "Git Path:            ${GIT_PATH}"
-        echo "SOPS Enabled:        ${SOPS_ENABLED}"
-        echo "Render Secrets:      ${RENDER_SECRETS}"
+        echo "Version:             ${VERSION}"
         echo "Concurrent:          ${CONCURRENT}"
         echo "Multitenant:         ${MULTITENANT}"
         echo "Network Policy:      ${NETWORK_POLICY}"
