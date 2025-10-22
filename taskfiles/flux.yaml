@@ -130,81 +130,67 @@ tasks:
         echo "${RENDERED_OUTPUT}"
         echo ""
 
-        # Ask to save
-        if gum confirm "Save to file?"; then
-          OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
-          echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
+        # Ask what to do next
+        ACTION=$(gum choose --header "What do you want to do?" "Apply to cluster" "Save to file" "Cancel")
 
-          echo ""
-          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance saved successfully!"
-          echo "Output saved to: ${OUTPUT_FILE}"
-        else
-          echo ""
-          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered (not saved)"
-        fi
+        case "${ACTION}" in
+          "Apply to cluster")
+            echo ""
+            gum style --border double --padding "1 2" --border-foreground 212 "🎯 Apply to Cluster"
+
+            # Select kubeconfig
+            KUBECONFIG_FILE=$(find {{.KUBECONFIG_FOLDER}} -type f | gum choose --header "Select kubeconfig")
+            if [ -z "${KUBECONFIG_FILE}" ]; then
+              echo "❌ No kubeconfig selected"
+              exit 1
+            fi
+
+            export KUBECONFIG="${KUBECONFIG_FILE}"
+            echo "Cluster: $(kubectl cluster-info | head -1)"
+            echo ""
+
+            # Check if flux-system namespace exists
+            if ! kubectl get namespace flux-system >/dev/null 2>&1; then
+              echo "⚠️  flux-system namespace does not exist"
+              if gum confirm "Create flux-system namespace?"; then
+                kubectl create namespace flux-system
+                echo "✅ Created flux-system namespace"
+                echo ""
+              fi
+            fi
+
+            if gum confirm "Apply FluxInstance to cluster?"; then
+              echo "${RENDERED_OUTPUT}" | kubectl apply -f -
+
+              echo ""
+              gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance applied!"
+              echo ""
+
+              echo "Checking FluxInstance status..."
+              kubectl get fluxinstance -n ${NAMESPACE} ${NAME} || true
+              echo ""
+              echo "Monitor Flux deployment with:"
+              echo "  kubectl get pods -n ${NAMESPACE} -w"
+            else
+              echo "❌ Apply cancelled"
+            fi
+            ;;
+
+          "Save to file")
+            OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Output file path? " --placeholder "/tmp/flux-instance.yaml")
+            echo "${RENDERED_OUTPUT}" > "${OUTPUT_FILE}"
+
+            echo ""
+            gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance saved successfully!"
+            echo "Output saved to: ${OUTPUT_FILE}"
+            ;;
+
+          "Cancel")
+            echo ""
+            gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance rendered (not saved)"
+            ;;
+        esac
         echo ""
-
-  apply:
-    desc: Render and apply FluxInstance to Kubernetes cluster
-    vars:
-      EXPORT_CMD_KUBECONFIG:
-        sh: |
-          KUBECONFIG_FILE=$(find {{.KUBECONFIG_FOLDER}} -type f | gum choose --header "Select kubeconfig")
-          echo "export KUBECONFIG=${KUBECONFIG_FILE}"
-    cmds:
-      - |
-        {{ .EXPORT_CMD_KUBECONFIG }}
-
-        echo "🎯 Selected cluster:"
-        kubectl cluster-info | head -1
-        echo ""
-
-        # Check if flux-system namespace exists
-        if ! kubectl get namespace flux-system >/dev/null 2>&1; then
-          echo "⚠️  flux-system namespace does not exist"
-          if gum confirm "Create flux-system namespace?"; then
-            kubectl create namespace flux-system
-            echo "✅ Created flux-system namespace"
-          fi
-        fi
-
-        # Render FluxInstance
-        task render
-
-        # Get the output file path
-        OUTPUT_FILE=$(gum input --value "/tmp/flux-instance.yaml" --prompt "Path to rendered FluxInstance? " --placeholder "/tmp/flux-instance.yaml")
-
-        if [ ! -f "${OUTPUT_FILE}" ]; then
-          echo "❌ File not found: ${OUTPUT_FILE}"
-          exit 1
-        fi
-
-        echo ""
-        gum style --border double --padding "1 2" --border-foreground 212 "Ready to apply FluxInstance"
-        echo "Cluster:  $(kubectl config current-context)"
-        echo "File:     ${OUTPUT_FILE}"
-        echo ""
-
-        if gum confirm "Apply FluxInstance to cluster?"; then
-          kubectl apply -f "${OUTPUT_FILE}"
-
-          echo ""
-          gum style --border double --padding "1 2" --border-foreground 57 "✅ FluxInstance applied!"
-          echo ""
-
-          # Show created resource
-          FLUX_NAME=$(grep "name:" "${OUTPUT_FILE}" | head -1 | awk '{print $2}')
-          FLUX_NAMESPACE=$(grep "namespace:" "${OUTPUT_FILE}" | head -1 | awk '{print $2}')
-
-          echo "Checking FluxInstance status..."
-          kubectl get fluxinstance -n "${FLUX_NAMESPACE}" "${FLUX_NAME}" || true
-
-          echo ""
-          echo "Monitor Flux deployment with:"
-          echo "  kubectl get pods -n ${FLUX_NAMESPACE} -w"
-        else
-          echo "❌ Deployment cancelled"
-        fi
 
   delete:
     desc: Delete FluxInstance from cluster
