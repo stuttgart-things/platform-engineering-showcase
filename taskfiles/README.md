@@ -6,7 +6,10 @@ Interactive automation tasks for platform engineering workflows.
 
 - [Requirements](#requirements)
 - [Flux Taskfile](#flux-taskfile)
-- [Environment Variables](#environment-variables)
+- [Dagger Shell Taskfile](#dagger-shell-taskfile)
+- [Git Taskfile](#git-taskfile)
+- [K3s Taskfile](#k3s-taskfile)
+- [Tekton Runs Taskfile](#tekton-runs-taskfile)
 
 ---
 
@@ -629,3 +632,947 @@ task --taskfile taskfiles/flux.yaml render
 # Check what environment variables are set
 printenv | grep -E "(GITHUB_|SOPS_)"
 ```
+
+---
+
+## Dagger Shell Taskfile
+
+Interactive taskfile for creating and managing Dagger container environments with custom base images and packages.
+
+### Overview
+
+**Location**: `taskfiles/dagger-shell.yaml`
+**Purpose**: Quick containerized development environments using Dagger
+
+### Available Tasks
+
+<details><summary><b>🐳 run-terminal - Interactive Container Terminal</b></summary>
+
+Launch an interactive terminal in a containerized environment with customizable base image and packages.
+
+```bash
+task --taskfile taskfiles/dagger-shell.yaml run-terminal
+```
+
+**Features:**
+- Choice of predefined base images or custom image
+- Optional package installation
+- Multiple package manager support
+- Pre-defined common packages + custom packages
+- Interactive multi-select for packages
+
+**Workflow:**
+1. **Select Base Image:**
+   - `cgr.dev/chainguard/wolfi-base` (Chainguard Wolfi)
+   - `alpine`
+   - `ubuntu:22.04`
+   - `debian:bookworm`
+   - `fedora:latest`
+   - Custom image (enter manually)
+
+2. **Add Packages (Optional):**
+   - Confirm if you want to add packages
+
+3. **Select Package Manager:**
+   - `apk add` (Alpine)
+   - `apt-get update && apt-get install -y` (Debian/Ubuntu)
+   - `dnf install -y` (Fedora)
+   - `yum install -y` (RHEL/CentOS)
+   - Custom command
+
+4. **Select Packages:**
+   - Multi-select from common packages: `curl`, `git`, `vim`, `htop`, `wget`, `bash`, `jq`, `make`, `gcc`, `python3`, `nodejs`, `go`
+   - Add custom packages
+
+5. **Launch Terminal:**
+   - Dagger creates and launches the container
+   - Interactive shell ready to use
+
+**Examples:**
+
+```bash
+# Alpine with basic tools
+# Select: alpine → Add packages: yes → apk add → curl, git, vim
+
+# Ubuntu for Python development
+# Select: ubuntu:22.04 → Add packages: yes → apt-get → python3, git, make
+
+# Chainguard minimal
+# Select: cgr.dev/chainguard/wolfi-base → No packages
+```
+
+</details>
+
+<details><summary><b>📦 publish-image - Build and Publish Container Image</b></summary>
+
+Build a container image with custom packages and publish to a registry.
+
+```bash
+task --taskfile taskfiles/dagger-shell.yaml publish-image
+```
+
+**Features:**
+- Reuses base image and package selection
+- Multiple registry support (ttl.sh, docker.io, ghcr.io, gcr.io, custom)
+- Auto-generates image name from base image
+- Timestamp-based tagging
+
+**Workflow:**
+1. **Base Image & Packages** (same as run-terminal)
+2. **Select Registry:**
+   - `ttl.sh` (temporary images, auto-expire)
+   - `docker.io` (Docker Hub)
+   - `ghcr.io` (GitHub Container Registry)
+   - `gcr.io` (Google Container Registry)
+   - Custom registry
+
+3. **Image Configuration:**
+   - Repository name (default: `stuttgart-things`)
+   - Image name (auto-extracted from base image or custom)
+   - Tag (default: `YYYYMMDD-HHMMSS` timestamp)
+
+4. **Build & Push:**
+   - Dagger builds the image
+   - Publishes to selected registry
+   - Displays final image reference
+
+**Examples:**
+
+```bash
+# Quick test image (expires in 24h)
+# ttl.sh/stuttgart-things/dev-env:20250101-120000
+
+# Publish to GitHub Container Registry
+# ghcr.io/stuttgart-things/python-dev:20250101-120000
+
+# Custom registry
+# registry.example.com/team/build-env:v1.0.0
+```
+
+**Output:**
+```
+Publishing to: ttl.sh/stuttgart-things/alpine-dev:20250122-143000
+✅ Image published: ttl.sh/stuttgart-things/alpine-dev:20250122-143000
+```
+
+</details>
+
+### Use Cases
+
+<details><summary><b>💡 Common Scenarios</b></summary>
+
+**1. Quick Debugging Environment:**
+```bash
+task --taskfile taskfiles/dagger-shell.yaml run-terminal
+# Alpine + curl, wget, vim → troubleshoot network issues
+```
+
+**2. Temporary Build Environment:**
+```bash
+task --taskfile taskfiles/dagger-shell.yaml run-terminal
+# Ubuntu + gcc, make, git → compile a project
+```
+
+**3. Create Custom CI Base Image:**
+```bash
+task --taskfile taskfiles/dagger-shell.yaml publish-image
+# Chainguard Wolfi + kubectl, helm, kcl → publish to ghcr.io
+```
+
+**4. Python Development Container:**
+```bash
+task --taskfile taskfiles/dagger-shell.yaml run-terminal
+# Ubuntu + python3, pip, git → development work
+```
+
+</details>
+
+---
+
+## Git Taskfile
+
+Interactive taskfile for Git workflow automation with conventional commits and pull request management.
+
+### Overview
+
+**Location**: `taskfiles/git.yaml`
+**Purpose**: Streamline Git operations, enforce commit conventions, manage PRs
+
+### Available Tasks
+
+<details><summary><b>💾 commit - Commit & Push Changes</b></summary>
+
+Interactive commit workflow with conventional commit support and change review.
+
+```bash
+task --taskfile taskfiles/git.yaml commit
+```
+
+**Features:**
+- Pre-commit hook execution
+- Git status review before commit
+- Conventional commit message templates
+- Custom commit messages with file context
+- Automatic push to origin
+
+**Workflow:**
+1. **Pre-commit Checks:** Runs `pre-commit` hooks (formatting, linting, etc.)
+2. **Set Upstream:** Links branch to remote
+3. **Pull Latest:** Syncs with remote branch
+4. **Review Changes:** Shows `git status`
+5. **Confirm Commit:** Review changes, confirm or cancel
+6. **Commit Message:**
+   - `CUSTOM MESSAGE` - Enter your own message (shows changed files)
+   - `feat: <branch-name>` - New feature
+   - `fix: <branch-name>` - Bug fix
+   - `BREAKING CHANGE: <branch-name>` - Breaking change
+7. **Push:** Automatic push to origin
+
+**Examples:**
+
+```bash
+# Feature branch workflow
+git checkout -b feat/add-flux-secrets
+# ... make changes ...
+task --taskfile taskfiles/git.yaml commit
+# Select: "feat: feat/add-flux-secrets"
+
+# Bug fix with custom message
+git checkout -b fix/yaml-output
+# ... make changes ...
+task --taskfile taskfiles/git.yaml commit
+# Select: "CUSTOM MESSAGE"
+# Enter: "fix(kcl): correct YAML formatting in flux module"
+```
+
+</details>
+
+<details><summary><b>🔀 pr - Create and Merge Pull Request</b></summary>
+
+Automate pull request creation, checks, and merge into main.
+
+```bash
+task --taskfile taskfiles/git.yaml pr
+```
+
+**Features:**
+- Commits changes first (runs `commit` task)
+- Creates PR via GitHub CLI
+- Auto-merge with rebase strategy
+- Auto-delete source branch after merge
+- Switches back to main and pulls latest
+
+**Workflow:**
+1. **Commit:** Runs commit task
+2. **Create PR:** `gh pr create -t "<branch>" -b "<branch> branch into main"`
+3. **Wait:** 2s delay for PR creation
+4. **Auto-merge:** Enables auto-merge with rebase
+5. **Cleanup:** Deletes branch after merge
+6. **Switch to main:** Checks out main and pulls latest
+
+**Requirements:**
+- GitHub CLI (`gh`) installed and authenticated
+- Branch protection rules configured (optional)
+- CI checks configured for auto-merge
+
+**Example:**
+```bash
+git checkout -b feat/new-taskfile
+# ... make changes ...
+task --taskfile taskfiles/git.yaml pr
+# Creates PR, waits for checks, auto-merges, switches to main
+```
+
+</details>
+
+<details><summary><b>🌿 branch - Create New Branch from Main</b></summary>
+
+Create and push a new branch from main with proper tracking.
+
+```bash
+task --taskfile taskfiles/git.yaml branch
+```
+
+**Workflow:**
+1. Switches to main
+2. Shows current branches
+3. Pulls latest from main
+4. Prompts for new branch name
+5. Creates local branch
+6. Pushes to remote
+7. Sets upstream tracking to origin/main
+
+**Example:**
+```bash
+task --taskfile taskfiles/git.yaml branch
+# Enter: "feat/add-dagger-docs"
+# Creates and pushes feat/add-dagger-docs
+```
+
+</details>
+
+<details><summary><b>🎯 do - Select Task Interactively</b></summary>
+
+Interactive task selector using gum.
+
+```bash
+task --taskfile taskfiles/git.yaml do
+# Shows menu of all available tasks
+```
+
+</details>
+
+<details><summary><b>🧹 run-pre-commit-hook - Domain Sanitization</b></summary>
+
+Replace sensitive domain names in YAML/Markdown files (e.g., `.sva.de` → `.example.com`).
+
+```bash
+task --taskfile taskfiles/git.yaml run-pre-commit-hook
+```
+
+**What it does:**
+- Finds all `.yaml`, `.yml`, `.md` files (excludes Taskfile.yaml)
+- Replaces `.sva.de` with `.example.com`
+- Stages modified files
+- Useful for sanitizing repos before public release
+
+</details>
+
+<details><summary><b>✅ check - Run Pre-commit Hooks</b></summary>
+
+Execute all configured pre-commit hooks.
+
+```bash
+task --taskfile taskfiles/git.yaml check
+```
+
+**Runs:** `pre-commit run -a`
+
+**Common checks:**
+- YAML validation
+- Markdown linting
+- Trailing whitespace
+- File size limits
+- Secret detection
+
+</details>
+
+### Workflow Example
+
+<details><summary><b>🔄 Complete Feature Development Flow</b></summary>
+
+```bash
+# 1. Create feature branch
+task --taskfile taskfiles/git.yaml branch
+# Enter: "feat/add-k3s-docs"
+
+# 2. Make changes
+vim taskfiles/k3s.yaml
+
+# 3. Commit with conventional commit
+task --taskfile taskfiles/git.yaml commit
+# Review changes → Confirm → Select "feat: feat/add-k3s-docs"
+
+# 4. Create PR and auto-merge
+task --taskfile taskfiles/git.yaml pr
+# Auto-creates PR, waits for CI, merges, returns to main
+
+# 5. Start next feature
+task --taskfile taskfiles/git.yaml branch
+```
+
+</details>
+
+---
+
+## K3s Taskfile
+
+Interactive taskfile for installing and managing K3s clusters with Cilium CNI.
+
+### Overview
+
+**Location**: `taskfiles/k3s.yaml`
+**Purpose**: Automated K3s installation without kube-proxy, with Cilium as CNI
+
+### Available Tasks
+
+<details><summary><b>🚀 install - Install K3s Cluster</b></summary>
+
+Install K3s with kube-proxy disabled, ready for Cilium CNI.
+
+```bash
+task --taskfile taskfiles/k3s.yaml install
+```
+
+**Features:**
+- Customizable K3s version
+- No kube-proxy (Cilium replacement)
+- No default CNI (Flannel disabled)
+- Network policy disabled (Cilium handles it)
+- Cluster-init mode (HA-ready)
+- ServiceLB and Traefik disabled
+- Automatic kubeconfig setup
+
+**Workflow:**
+1. **K3s Version:** Select version (default: `v1.34.1+k3s1`)
+2. **Config Location:** Where to save K3s config (default: `/tmp/k3s-config.yaml`)
+3. **Cluster Name:** Cluster identifier (default: `k3s`)
+4. **Review Config:** Shows generated configuration
+5. **Confirm:** Proceed with installation
+6. **Install:** Downloads and installs K3s
+7. **Kubeconfig:** Copies to `~/.kube/<cluster-name>`
+8. **Verify:** Shows cluster nodes
+
+**Generated K3s Config:**
+```yaml
+write-kubeconfig-mode: 0644
+flannel-backend: none
+disable-kube-proxy: true
+disable-network-policy: true
+cluster-init: true
+disable:
+  - servicelb
+  - traefik
+```
+
+**Example:**
+```bash
+task --taskfile taskfiles/k3s.yaml install
+# K3S VERSION? v1.34.1+k3s1
+# Config path? /tmp/k3s-config.yaml
+# Cluster name? dev-k3s
+# Proceed? Yes
+# ✅ Kubeconfig saved to ~/.kube/dev-k3s
+```
+
+</details>
+
+<details><summary><b>🛠️ cilium:config - Generate Cilium Values</b></summary>
+
+Generate Helm values for Cilium kube-proxy replacement.
+
+```bash
+task --taskfile taskfiles/k3s.yaml cilium:config
+```
+
+**Features:**
+- Auto-detects API server IP
+- Configures kube-proxy replacement
+- L2 announcements for LoadBalancer
+- External IPs support
+- Rate limiting configuration
+- Single operator replica (local dev)
+
+**Workflow:**
+1. **Output Path:** Where to save config (default: `/tmp/cilium-values.yaml`)
+2. **Auto-detect:** Gets API server IP from hostname
+3. **Generate:** Creates Helm values file
+4. **Display:** Shows configuration
+
+**Generated Cilium Config:**
+```yaml
+k8sServiceHost: <auto-detected-ip>
+k8sServicePort: 6443
+kubeProxyReplacement: true
+
+l2announcements:
+  enabled: true
+
+externalIPs:
+  enabled: true
+
+k8sClientRateLimit:
+  qps: 50
+  burst: 200
+
+operator:
+  replicas: 1
+  rollOutPods: true
+
+rollOutCiliumPods: true
+
+ingressController:
+  enabled: false
+```
+
+</details>
+
+<details><summary><b>🌐 cilium:install - Install Cilium CNI</b></summary>
+
+Install Cilium as kube-proxy replacement using generated config.
+
+```bash
+task --taskfile taskfiles/k3s.yaml cilium:install
+```
+
+**Dependencies:** Runs `cilium:config` first
+
+**Features:**
+- Uses Cilium CLI
+- Waits for pods to be ready (60s timeout)
+- Status verification
+- Error handling
+
+**Workflow:**
+1. **Generate Config:** Runs `cilium:config` task
+2. **Config Path:** Select Cilium config file (default: `/tmp/cilium-values.yaml`)
+3. **Kubeconfig Path:** Select kubeconfig (default: `~/.kube/k3s`)
+4. **Install:** Runs `cilium install --values <config>`
+5. **Wait:** Monitors Cilium pods until ready
+6. **Status:** Shows `cilium status`
+
+**Example:**
+```bash
+task --taskfile taskfiles/k3s.yaml cilium:install
+# Config: /tmp/cilium-values.yaml
+# Kubeconfig: ~/.kube/dev-k3s
+# Installing Cilium...
+# Waiting for Cilium pods...
+# ✅ Cilium pods are running
+# Status: Healthy
+```
+
+</details>
+
+<details><summary><b>🗑️ uninstall - Uninstall K3s</b></summary>
+
+Completely remove K3s and all data.
+
+```bash
+task --taskfile taskfiles/k3s.yaml uninstall
+```
+
+**Warning:** This is destructive! Confirms before execution.
+
+**What it does:**
+- Checks if K3s is installed
+- Confirms deletion
+- Runs `/usr/local/bin/k3s-uninstall.sh`
+- Removes all cluster data
+
+</details>
+
+### Complete Setup Example
+
+<details><summary><b>🎯 Full K3s + Cilium Installation</b></summary>
+
+```bash
+# 1. Install K3s (no kube-proxy, no CNI)
+task --taskfile taskfiles/k3s.yaml install
+# Version: v1.34.1+k3s1
+# Cluster: dev-k3s
+
+# 2. Generate Cilium config
+task --taskfile taskfiles/k3s.yaml cilium:config
+# Output: /tmp/cilium-values.yaml
+
+# 3. Install Cilium
+task --taskfile taskfiles/k3s.yaml cilium:install
+# Config: /tmp/cilium-values.yaml
+# Kubeconfig: ~/.kube/dev-k3s
+
+# 4. Verify installation
+export KUBECONFIG=~/.kube/dev-k3s
+kubectl get nodes
+kubectl get pods -n kube-system
+cilium status
+
+# 5. Test connectivity
+kubectl run test --image=nginx
+kubectl expose pod test --port=80
+kubectl get svc test
+```
+
+**Result:** K3s cluster with Cilium CNI, ready for workloads!
+
+</details>
+
+### Use Cases
+
+<details><summary><b>💡 When to Use This Taskfile</b></summary>
+
+**✅ Perfect for:**
+- Local development clusters
+- Testing Cilium features (eBPF, NetworkPolicy, etc.)
+- Learning kube-proxy replacement
+- Lightweight Kubernetes environments
+- CI/CD test clusters
+
+**❌ Not recommended for:**
+- Production (use production-grade installers)
+- Multi-node HA clusters (though cluster-init is enabled)
+- Environments requiring default K3s networking
+
+</details>
+
+---
+
+## Tekton Runs Taskfile
+
+Interactive taskfile for creating and managing Tekton PipelineRuns with Ansible and Buildah pipelines.
+
+### Overview
+
+**Location**: `taskfiles/tekton-runs.yaml`
+**Purpose**: Generate and execute Tekton pipelines for Ansible automation and container builds
+
+**OCI Packages:**
+- `oci://ghcr.io/stuttgart-things/kcl-tekton-pr:0.2.1` (Ansible)
+- `oci://ghcr.io/stuttgart-things/kcl-tekton-buildah` (Buildah)
+
+### Available Tasks
+
+<details><summary><b>🤖 create:ansible:pipelinerun - Run Ansible Playbooks</b></summary>
+
+Create and execute Tekton PipelineRun for Ansible playbook automation.
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml create:ansible:pipelinerun
+```
+
+**Features:**
+- Interactive kubeconfig selection
+- StorageClass selection for PVC
+- Multi-select Ansible playbooks
+- Multi-select Ansible collections
+- Interactive inventory builder
+- Customizable Ansible working image
+- Pipeline prefix customization
+- Automatic PipelineRun creation
+- Live log streaming with `tkn`
+
+**Workflow:**
+1. **Select Kubeconfig:** Choose from `~/.kube/` directory
+2. **Verify Cluster:** Shows nodes
+3. **Select StorageClass:** Choose SC for workspace PVC
+4. **Select Namespace:** Target namespace for PipelineRun
+5. **Select Ansible Image:** Default: `ghcr.io/stuttgart-things/sthings-ansible:11.0.0`
+6. **Pipeline Prefix:** Default: `pr-ansible`
+7. **Select Playbooks:** Multi-select from:
+   - `sthings.baseos.prepare_env`
+   - `sthings.baseos.setup`
+   - `sthings.apps.deploy`
+8. **Select Collections:** Multi-select from:
+   - `community.crypto`, `community.general`, `ansible.posix`
+   - `kubernetes.core`, `community.docker`, `community.vmware`
+   - `awx.awx`, `community.hashi_vault`
+   - `sthings-container`, `sthings-baseos`, `sthings-awx`, `sthings-rke`
+9. **Build Inventory:** Interactive inventory builder
+   - Add groups (e.g., `webservers`, `databases`)
+   - Add hosts per group
+   - Auto-encodes to base64
+10. **Generate Manifest:** KCL renders PipelineRun YAML
+11. **Apply to Cluster:** Creates PipelineRun
+12. **Stream Logs:** Follows logs with `tkn pr logs -f`
+
+**Pre-defined Collections:**
+```
+community.crypto:2.22.3
+community.general:10.1.0
+ansible.posix:2.0.0
+kubernetes.core:5.0.0
+community.docker:4.1.0
+community.vmware:5.2.0
+awx.awx:24.6.1
+community.hashi_vault:6.2.0
+sthings-container-25.0.286
+sthings-baseos-25.6.990
+sthings-awx-25.4.506
+sthings-rke-25.6.394
+```
+
+**Example Inventory Builder:**
+```
+Enter inventory group name: webservers
+Enter host for group 'webservers': web1.example.com
+Enter host for group 'webservers': web2.example.com
+Enter host for group 'webservers': <leave empty>
+
+Enter inventory group name: databases
+Enter host for group 'databases': db1.example.com
+Enter host for group 'databases': <leave empty>
+
+Enter inventory group name: <leave empty to finish>
+```
+
+**Generated Inventory:**
+```ini
+[webservers]
+web1.example.com
+web2.example.com
+
+[databases]
+db1.example.com
+```
+
+**Output:**
+```bash
+Generating Tekton PipelineRun manifest with KCL...
+KCL output saved to /tmp/pipelinerun.yaml
+Applying PipelineRun to cluster...
+pipelinerun.tekton.dev/pr-ansible-20250122 created
+Most recent PipelineRun: pr-ansible-20250122
+Fetching logs for pr-ansible-20250122...
+[install-collections : install-collections] Installing collections...
+[run-playbooks : run-playbooks] Running playbook: sthings.baseos.setup...
+```
+
+</details>
+
+<details><summary><b>🐳 create:buildah:pipelinerun - Build Container Images</b></summary>
+
+Create Tekton PipelineRun for building container images with Buildah.
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml create:buildah:pipelinerun
+```
+
+**Features:**
+- Interactive kubeconfig selection
+- StorageClass selection for build cache
+- KCL-based manifest generation
+- Uses `kcl-tekton-buildah` module
+
+**Workflow:**
+1. **Select Kubeconfig:** Choose from `~/.kube/`
+2. **Verify Cluster:** Shows nodes
+3. **Select StorageClass:** Choose SC for build workspace
+4. **Generate Manifest:** KCL renders PipelineRun
+5. **Save to File:** `/tmp/buildah-pr.yaml`
+
+**Configuration Options (in KCL):**
+- `gitUrl` - Git repository URL
+- `branchName` - Git branch (default: `main`)
+- `context` - Build context path
+- `verifySsl` - SSL verification (default: `true`)
+
+**Example:**
+```bash
+task --taskfile taskfiles/tekton-runs.yaml create:buildah:pipelinerun
+# Kubeconfig: ~/.kube/dev-k3s
+# StorageClass: local-path
+# Generated: /tmp/buildah-pr.yaml
+
+# Apply manually
+kubectl apply -f /tmp/buildah-pr.yaml -n tekton-ci
+```
+
+**Note:** Currently generates manifest only (commented out auto-apply)
+
+</details>
+
+<details><summary><b>🔧 build:ansible:inventory - Build Ansible Inventory</b></summary>
+
+Standalone inventory builder (used by `create:ansible:pipelinerun`).
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml build:ansible:inventory
+```
+
+**Output:** Base64-encoded inventory string
+
+**Example:**
+```bash
+INVENTORY=$(task --taskfile taskfiles/tekton-runs.yaml build:ansible:inventory)
+echo $INVENTORY | base64 -d
+```
+
+</details>
+
+<details><summary><b>🎯 kube - Select Kubeconfig</b></summary>
+
+Interactive kubeconfig selector with export command.
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml kube
+```
+
+**Workflow:**
+1. Lists all files in `~/.kube/`
+2. Select kubeconfig
+3. Shows nodes
+4. Prints export command
+
+**Output:**
+```bash
+SWITCHING TO dev-k3s
+NAME      STATUS   ROLES                  AGE   VERSION
+dev-k3s   Ready    control-plane,master   5m    v1.34.1+k3s1
+
+export KUBECONFIG=/home/user/.kube/dev-k3s
+```
+
+**Usage:**
+```bash
+eval $(task --taskfile taskfiles/tekton-runs.yaml kube | grep '^export')
+kubectl get pods
+```
+
+</details>
+
+<details><summary><b>📋 do - Select Task Interactively</b></summary>
+
+Interactive task menu using gum.
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml do
+```
+
+</details>
+
+<details><summary><b>🔢 pr:select:list - Multi-select from List</b></summary>
+
+Helper task for multi-selecting items from comma-separated list.
+
+```bash
+task --taskfile taskfiles/tekton-runs.yaml pr:select:list listitems="item1,item2,item3"
+```
+
+**Output:** JSON array format `["item1", "item2"]`
+
+</details>
+
+### Complete Ansible Pipeline Example
+
+<details><summary><b>🎯 Full Ansible Playbook Execution</b></summary>
+
+**Scenario:** Configure web servers with base OS setup and deploy applications
+
+```bash
+# 1. Run the Ansible pipeline task
+task --taskfile taskfiles/tekton-runs.yaml create:ansible:pipelinerun
+
+# Interactive prompts:
+# ├─ Kubeconfig: dev-k3s
+# ├─ StorageClass: local-path
+# ├─ Namespace: tekton-ci
+# ├─ Ansible Image: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
+# ├─ Pipeline Prefix: pr-ansible
+# ├─ Playbooks:
+# │  ├─ ✓ sthings.baseos.prepare_env
+# │  ├─ ✓ sthings.baseos.setup
+# │  └─ ✓ sthings.apps.deploy
+# ├─ Collections:
+# │  ├─ ✓ community.general:10.1.0
+# │  ├─ ✓ ansible.posix:2.0.0
+# │  └─ ✓ sthings-baseos-25.6.990
+# └─ Inventory Builder:
+#    ├─ Group: webservers
+#    │  ├─ web1.example.com
+#    │  └─ web2.example.com
+#    └─ Group: databases
+#       └─ db1.example.com
+
+# 2. Watch pipeline execution
+# (automatically starts streaming logs)
+
+# 3. Verify results
+kubectl get pipelineruns -n tekton-ci
+tkn pr describe pr-ansible-20250122 -n tekton-ci
+```
+
+**Generated PipelineRun:**
+```yaml
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: pr-ansible-20250122
+  namespace: tekton-ci
+spec:
+  pipelineRef:
+    name: ansible-playbook-pipeline
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+  params:
+    - name: ansible-image
+      value: ghcr.io/stuttgart-things/sthings-ansible:11.0.0
+    - name: playbooks
+      value: ["sthings.baseos.prepare_env", "sthings.baseos.setup", "sthings.apps.deploy"]
+    - name: collections
+      value: ["community.general:10.1.0", "ansible.posix:2.0.0", "sthings-baseos-25.6.990"]
+    - name: inventory
+      value: "W3dlYnNlcnZlcnNdCndlYjEuZXhhbXBsZS5jb20Kd2ViMi5leGFtcGxlLmNvbQoKW2RhdGFiYXNlc10KZGIXMS5leGFtcGxlLmNvbQo="
+```
+
+</details>
+
+### Use Cases
+
+<details><summary><b>💡 Common Scenarios</b></summary>
+
+**1. Infrastructure Provisioning:**
+```bash
+# Playbooks: sthings.baseos.prepare_env, sthings.baseos.setup
+# Inventory: Multiple server groups
+# Collections: community.general, ansible.posix
+```
+
+**2. Application Deployment:**
+```bash
+# Playbooks: sthings.apps.deploy
+# Inventory: Application servers
+# Collections: kubernetes.core, community.docker
+```
+
+**3. AWX Configuration:**
+```bash
+# Playbooks: sthings.awx.*
+# Collections: awx.awx, community.hashi_vault
+```
+
+**4. VMware Automation:**
+```bash
+# Collections: community.vmware
+# Playbooks: VM provisioning/configuration
+```
+
+**5. Container Image Builds:**
+```bash
+# Use: create:buildah:pipelinerun
+# Purpose: CI/CD container builds with Tekton
+```
+
+</details>
+
+### Requirements
+
+<details><summary><b>📋 Prerequisites</b></summary>
+
+**Cluster Requirements:**
+- Tekton Pipelines installed
+- StorageClass available for PVCs
+- Namespace for PipelineRuns (e.g., `tekton-ci`)
+
+**CLI Tools:**
+- `kubectl` - Kubernetes CLI
+- `tkn` - Tekton CLI
+- `gum` - Interactive prompts
+- `kcl` - KCL CLI
+
+**Install Tekton CLI:**
+```bash
+brew install tektoncd-cli
+
+# Or download binary
+curl -LO https://github.com/tektoncd/cli/releases/latest/download/tkn_Linux_x86_64.tar.gz
+tar xzf tkn_Linux_x86_64.tar.gz
+sudo mv tkn /usr/local/bin/
+```
+
+**Tekton Pipelines:**
+Assumes pipelines are pre-installed in cluster:
+- `ansible-playbook-pipeline`
+- `buildah-build-pipeline`
+
+</details>
+
+---
+
+## Tips & Best Practices
