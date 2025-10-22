@@ -28,6 +28,18 @@ tasks:
         # Secret Rendering - Ask first to set up references
         echo ""
         gum style --border double --padding "1 2" --border-foreground 212 "Kubernetes Secrets"
+
+        # Check for environment variables
+        if [ -n "${GITHUB_USER}" ]; then
+          echo "✓ Found GITHUB_USER environment variable"
+        fi
+        if [ -n "${GITHUB_TOKEN}" ]; then
+          echo "✓ Found GITHUB_TOKEN environment variable"
+        fi
+        if [ -n "${SOPS_AGE_KEY}" ]; then
+          echo "✓ Found SOPS_AGE_KEY environment variable"
+        fi
+
         RENDER_SECRETS=$(gum choose --header "Render Kubernetes Secrets?" "false" "true")
 
         # Git Secret Configuration
@@ -35,8 +47,18 @@ tasks:
           echo ""
           gum style --foreground 212 "📝 Git Authentication Secret"
           GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git secret name? " --placeholder "git-token-auth")
-          GIT_USERNAME=$(gum input --prompt "Git username? " --placeholder "github-user")
-          GIT_PASSWORD=$(gum input --password --prompt "Git password/token? " --placeholder "ghp_...")
+
+          # Use environment variable as default if available
+          DEFAULT_GIT_USER="${GITHUB_USER:-github-user}"
+          GIT_USERNAME=$(gum input --value "${DEFAULT_GIT_USER}" --prompt "Git username? " --placeholder "github-user")
+
+          # Use environment variable for token if available, otherwise prompt
+          if [ -n "${GITHUB_TOKEN}" ]; then
+            echo "Using GITHUB_TOKEN from environment"
+            GIT_PASSWORD="${GITHUB_TOKEN}"
+          else
+            GIT_PASSWORD=$(gum input --password --prompt "Git password/token? " --placeholder "ghp_...")
+          fi
         else
           GIT_PULL_SECRET=$(gum input --value "git-token-auth" --prompt "Git secret name (existing)? " --placeholder "git-token-auth")
         fi
@@ -51,7 +73,14 @@ tasks:
             echo ""
             gum style --foreground 212 "🔐 SOPS Decryption Secret"
             SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name? " --placeholder "sops-age")
-            SOPS_AGE_KEY=$(gum input --password --prompt "SOPS AGE private key? " --placeholder "AGE-SECRET-KEY-1...")
+
+            # Use environment variable for SOPS key if available, otherwise prompt
+            if [ -n "${SOPS_AGE_KEY}" ]; then
+              echo "Using SOPS_AGE_KEY from environment"
+              SOPS_AGE_KEY_VALUE="${SOPS_AGE_KEY}"
+            else
+              SOPS_AGE_KEY_VALUE=$(gum input --password --prompt "SOPS AGE private key? " --placeholder "AGE-SECRET-KEY-1...")
+            fi
           else
             SOPS_SECRET=$(gum input --value "sops-age" --prompt "SOPS secret name (existing)? " --placeholder "sops-age")
           fi
@@ -153,12 +182,10 @@ tasks:
           KCL_CMD="${KCL_CMD} -D gitUsername=${GIT_USERNAME}"
           KCL_CMD="${KCL_CMD} -D gitPassword=${GIT_PASSWORD}"
 
-          if [ "${SOPS_ENABLED}" = "true" ] && [ -n "${SOPS_AGE_KEY}" ]; then
-            KCL_CMD="${KCL_CMD} -D sopsAgeKey=${SOPS_AGE_KEY}"
+          if [ "${SOPS_ENABLED}" = "true" ] && [ -n "${SOPS_AGE_KEY_VALUE}" ]; then
+            KCL_CMD="${KCL_CMD} -D sopsAgeKey=${SOPS_AGE_KEY_VALUE}"
           fi
-        fi
-
-        # Execute KCL and store output
+        fi        # Execute KCL and store output
         RENDERED_OUTPUT=$(${KCL_CMD} | grep -A 1000 "^items:")
 
         # Show preview
