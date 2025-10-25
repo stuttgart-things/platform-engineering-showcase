@@ -191,7 +191,7 @@ task --taskfile taskfiles/flux.yaml render
 ```
 
 **Configuration:**
-- Render Secrets: `false`
+- Render Secrets: `false` # pragma: allowlist secret
 - Cluster: `dev-k8s`
 - Git URL: `https://github.com/my-org/dev-configs.git`
 - Git Path: `clusters/dev-k8s`
@@ -218,15 +218,15 @@ spec:
 ```bash
 # Set environment variables
 export GITHUB_USER="patrick-hermann-sva"
-export GITHUB_TOKEN="ghp_..."
-export SOPS_AGE_KEY="AGE-SECRET-KEY-1..."
+export GITHUB_TOKEN="ghp_..." # pragma: allowlist secret
+export SOPS_AGE_KEY="AGE-SECRET-KEY-1..." # pragma: allowlist secret
 
 # Run taskfile
 task --taskfile taskfiles/flux.yaml render
 ```
 
 **Configuration:**
-- Render Secrets: `true` ← Automatically uses env vars!
+- Render Secrets: `true` ← Automatically uses env vars! # pragma: allowlist secret
 - Cluster: `production`
 - Git URL: `https://github.com/my-org/infrastructure.git`
 - Git Path: `clusters/production`
@@ -247,7 +247,7 @@ metadata:
   namespace: flux-system
 stringData:
   username: patrick-hermann-sva
-  password: ghp_...
+  password: ghp_...# pragma: allowlist secret
 ---
 apiVersion: v1
 kind: Secret
@@ -255,7 +255,7 @@ metadata:
   name: sops-age
   namespace: flux-system
 stringData:
-  age.agekey: AGE-SECRET-KEY-1...
+  age.agekey: AGE-SECRET-KEY-1... # pragma: allowlist secret
 ```
 
 **Apply:**
@@ -316,8 +316,8 @@ The taskfile automatically detects and displays checkmarks for available environ
 ```bash
 # Set environment variables
 export GITHUB_USER="patrick-hermann-sva"
-export GITHUB_TOKEN="ghp_..."
-export SOPS_AGE_KEY="AGE-SECRET-KEY-1..."
+export GITHUB_TOKEN="ghp_..."# pragma: allowlist secret
+export SOPS_AGE_KEY="AGE-SECRET-KEY-1..." # pragma: allowlist secret
 
 # Run interactive taskfile
 task --taskfile taskfiles/flux.yaml render
@@ -1498,7 +1498,7 @@ spec:
     - name: collections
       value: ["community.general:10.1.0", "ansible.posix:2.0.0", "sthings-baseos-25.6.990"]
     - name: inventory
-      value: "W3dlYnNlcnZlcnNdCndlYjEuZXhhbXBsZS5jb20Kd2ViMi5leGFtcGxlLmNvbQoKW2RhdGFiYXNlc10KZGIXMS5leGFtcGxlLmNvbQo="
+  value: "W3dlYnNlcnZlcnNdCndlYjEuZXhhbXBsZS5jb20Kd2ViMi5leGFtcGxlLmNvbQoKW2RhdGFiYXNlc10KZGIXMS5leGFtcGxlLmNvbQo=" # pragma: allowlist secret
 ```
 
 </details>

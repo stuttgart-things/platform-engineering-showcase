@@ -1,0 +1,14 @@
+---
+version: "3"
+tasks:
+  create-new-module:
+    desc: Create new dagger module
+    cmds:
+      - dagger init --sdk={{ .SDK }} --source=./{{ .MODULE_NAME }} --name={{ .MODULE_NAME }}
+      - jq '.source = "."' dagger.json > tmp.json && mv tmp.json dagger.json
+      - mv dagger.json ./{{ .MODULE_NAME }}/dagger.json
+    vars:
+      MODULE_NAME:
+        sh: gum input --placeholder "Module name"
+      SDK:
+        sh: gum choose "go" "python"
