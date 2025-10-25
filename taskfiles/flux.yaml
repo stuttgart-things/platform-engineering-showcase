@@ -1,6 +1,5 @@
 ---
 version: "3"
-
 vars:
   KUBECONFIG_FOLDER: ~/.kube
   FLUX_INSTANCE_PACKAGE: oci://ghcr.io/stuttgart-things/kcl-flux-instance
