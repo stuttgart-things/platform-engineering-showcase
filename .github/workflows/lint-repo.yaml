@@ -2,10 +2,14 @@ name: Lint repo files
 on:
   push:
     branches:
-      - '*'
+    - main
+    - feature/*
+    - fix/*
   pull_request:
     branches:
-      - '*'
+    - main
+    - feature/*
+    - fix/*
 
 jobs:
   lint-repository-files:
