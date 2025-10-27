@@ -1,0 +1,56 @@
+---
+extends: default
+
+rules:
+  # Indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Line length
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # Trailing spaces
+  trailing-spaces: enable
+
+  # Empty lines
+  empty-lines: enable
+  empty-lines-at-start-of-file: disable
+  empty-lines-at-end-of-file: enable
+
+  # Comments
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  # Document markers
+  document-start: disable  # Don't require --- at start
+  document-end: disable    # Don't require ... at end
+
+  # Syntax
+  braces: enable
+  brackets: enable
+  colons: enable
+  commas: enable
+  comments-indentation: disable
+  hyphens: enable
+  key-duplicates: enable
+  new-line-at-end-of-file: enable
+  new-lines: enable
+  octal-values: disable
+
+  # Ansible-specific (quotes for variables)
+  quoted-strings:
+    quote-type: any
+    required: only-when-needed
+    extra-allowed: ['^{{', '^{{', '^{%', '^{%']
+
+  # Truthy values
+  truthy:
+    level: warning
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
