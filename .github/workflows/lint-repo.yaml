@@ -27,7 +27,7 @@ jobs:
           version: v0.19.3
           verb: call
           module: github.com/stuttgart-things/blueprints/repository-linting@v1.17.0
-          args: validate-multiple-technologies --src ${{ env.APP_DIR }} export --path ${{ env.OUTPUT_FILE }} --ignore-error=${{ env.CONTINUE_ERROR }}
+          args: validate-multiple-technologies --src ${{ env.APP_DIR }} export --path ${{ env.OUTPUT_FILE }}
 
       - name: Show lint results
         run: |
