@@ -8,12 +8,6 @@ includes:
   # shell:
   #   taskfile: ./taskfiles/dagger-shell.yaml
 
-vars:
-  DATE:
-    sh: date +"%y.%m%d.%H%M"
-  BRANCH:
-    sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
-
 tasks:
   run-terraform-shell:
     cmds:
@@ -92,6 +86,15 @@ tasks:
 
         # Run the selected task
         [ -n "$task_name" ] && task "$task_name"
+
+  lint-platform-engineering-showcase-repo:
+    desc: Lint platform-engineering-showcase repository
+    cmds:
+      - task: lint:lint-repository-files
+        vars:
+          CODE_DIR: "./"
+          YAML_CONFIG_PATH: ".yamllint.yml"
+          EXPORT_PATH: "/tmp/platform-engineering-showcase.txt"
 
   default:
     desc: Default task is select & do (work)
