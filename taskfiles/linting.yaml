@@ -4,7 +4,7 @@ vars:
   PROJECT_NAME:
     sh: echo ${PWD##*/}
   MODULE: github.com/stuttgart-things/blueprints/repository-linting
-  VERSION: v1.16.1
+  VERSION: v1.17.0
 
 tasks:
   lint-repository-files:

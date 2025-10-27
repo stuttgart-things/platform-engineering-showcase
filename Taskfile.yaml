@@ -83,7 +83,7 @@ tasks:
         - gateway-api/gateway-api-cluster.yaml
       KUBECONFIG_PATH: ~/.kube
 
-  default:
+  do:
     desc: Select a task to run
     cmds:
       - |
@@ -92,6 +92,11 @@ tasks:
 
         # Run the selected task
         [ -n "$task_name" ] && task "$task_name"
+
+  default:
+    desc: Default task is select & do (work)
+    cmds:
+      - task do
 
   run-pre-commit-hook:
     deps:
