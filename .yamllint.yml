@@ -19,8 +19,6 @@ rules:
 
   # Empty lines
   empty-lines: enable
-  empty-lines-at-start-of-file: disable
-  empty-lines-at-end-of-file: enable
 
   # Comments
   comments:
