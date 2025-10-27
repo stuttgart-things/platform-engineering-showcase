@@ -12,15 +12,15 @@ tasks:
     cmds:
       - |
         dagger call -m {{ .MODULE }}@{{ .VERSION }} {{ .FUNCTION }} \
-        --src {{ .CODE_DIR }} \
+        --src {{ .CODE_DIR | default "./" }} \
         --yaml-config-path {{ .YAML_CONFIG_PATH }} \
-        export --path {{ .EXPORT_PATH }}
+        export --path {{ .EXPORT_PATH | default "/tmp/lint-findings.txt" }}
 
-        code {{ .EXPORT_PATH }}
+        code {{ .EXPORT_PATH | default "/tmp/lint-findings.txt" }}
     vars:
       FUNCTION: validate-multiple-technologies
       CODE_DIR: "./"
-      EXPORT_PATH: "/tmp/{{ .PROJECT_NAME }}-lint-findings.txt"
+      #EXPORT_PATH: "/tmp/{{ .PROJECT_NAME }}-lint-findings.txt"
       # YAML_CONFIG_PATH: ""
 
   analyze-lint-report:
