@@ -1,39 +1,92 @@
-name: Lint repo files
+---
+name: Run Repository Linting
 on:
   push:
     branches:
-    - main
-    - feature/*
-    - fix/*
+      - main
+      - feature/*
+      - fix/*
   pull_request:
     branches:
-    - main
-    - feature/*
-    - fix/*
+      - main
+      - feature/*
+      - fix/*
 
 jobs:
-  lint-repository-files:
-    runs-on: ubuntu-latest
-    env:
-      APP_DIR: "./"                        # Directory to lint
-      OUTPUT_FILE: "/tmp/platform-engineering-showcase-lint-findings.txt"
-      CONTINUE_ERROR: "true"               # if you want to ignore errors
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+  Lint-Repository:
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-repository-linting.yaml@main
+    with:
+      runs-on: ubuntu-latest
+      environment-name: linting
+      app-directory: "./"
+      output-file: "/tmp/platform-engineering-showcase-lint-findings.txt"
+      continue-error: "true"
+      dagger-version: v0.19.3
+      dagger-module-version: v1.17.0
+      branch-name: ${{ github.head_ref || github.ref_name }}
+    secrets: inherit # pragma: allowlist secret
 
-      - name: Call Dagger Lint Module
-        uses: dagger/dagger-for-github@v8.2.0
-        with:
-          version: v0.19.3
-          verb: call
-          module: github.com/stuttgart-things/blueprints/repository-linting@v1.17.0
-          args: validate-multiple-technologies --src ${{ env.APP_DIR }} export --path ${{ env.OUTPUT_FILE }}
+# ---
+# name: Lint Repository Files
+# on:
+#   workflow_call:
+#     inputs:
+#       runs-on:
+#         required: false
+#         type: string
+#         default: ubuntu-latest
+#       app-directory:
+#         required: false
+#         type: string
+#         default: "./"
+#       output-file:
+#         required: false
+#         type: string
+#         default: "/tmp/platform-engineering-showcase-lint-findings.txt"
+#       continue-error:
+#         required: false
+#         type: string
+#         default: "true"
+#       branch-name:
+#         required: false
+#         type: string
+#         default: main
+#       dagger-version:
+#         required: false
+#         type: string
+#         default: v0.19.3
+#       dagger-module-version:
+#         required: false
+#         type: string
+#         default: v1.17.0
+#       environment-name:
+#         required: false
+#         type: string
+#         default: linting
 
-      - name: Show lint results
-        run: |
-          echo "Lint findings:"
-          cat ${{ env.OUTPUT_FILE }}
+# jobs:
+#   lint-repository-files:
+#     name: Lint Repository Files
+#     runs-on: ${{ inputs.runs-on }}
+#     environment: ${{ inputs.environment-name }}
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v5
+#         with:
+#           fetch-depth: 0
+#           ref: ${{ inputs.branch-name }}
+
+#       - name: Call Dagger Lint Module
+#         uses: dagger/dagger-for-github@v8.2.0
+#         with:
+#           version: ${{ inputs.dagger-version }}
+#           verb: call
+#           module: github.com/stuttgart-things/blueprints/repository-linting@${{ inputs.dagger-module-version }}
+#           args: validate-multiple-technologies --src ${{ inputs.app-directory }} export --path ${{ inputs.output-file }}
+
+#       - name: Show Lint Results
+#         if: always()
+#         run: |
+#           echo "Lint findings:"
+#           cat ${{ inputs.output-file }} || echo "No findings file generated."
