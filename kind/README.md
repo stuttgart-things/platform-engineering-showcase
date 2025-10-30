@@ -4,38 +4,40 @@
 
 <details><summary>GENERATE CLUSTER CONFIG</summary>
 
-```
+```bash
 IP=$(hostname -I | awk '{print $1}')
 KUBE_API_PORT=31943
 CLUSTER_NAME=kind-demo
+CLUSTER_CONFIG_PATH=/tmp/${CLUSTER_NAME}-cluster.yaml
 
-kcl run oci://ghcr.io/stuttgart-things/k8s-kind-cluster \
+kcl run --quiet oci://ghcr.io/stuttgart-things/k8s-kind-cluster \
 -D portRangeStart=32100 \
 -D portRangeCount=2 \
 -D clusterName=${CLUSTER_NAME} \
 -D apiServerAddress=${IP} \
 -D 'registryMirrors=["https://docker.harbor.idp.kubermatic.sva.dev"]' \
--D apiServerPort=${KUBE_API_PORT} > /tmp/cluster.yaml
+-D apiServerPort=${KUBE_API_PORT} > ${CLUSTER_CONFIG_PATH}
 ```
 
-
 </details>
-
 
 <details><summary>CREATE CLUSTER</summary>
 
 ```bash
-# CREATE CLUSTER
-KUBECONFIG_PATH=~/.kube/kind-platform
+KUBE_API_PORT=31943
+CLUSTER_NAME=kind-demo
+CLUSTER_CONFIG_PATH=/tmp/${CLUSTER_NAME}-cluster.yaml
+
+KUBECONFIG_PATH=~/.kube/kind-${CLUSTER_NAME}
 
 mkdir -p ~/.kube || true
 
 kind create cluster \
---config cluster.yaml \
+--config ${CLUSTER_CONFIG_PATH} \
 --kubeconfig ${KUBECONFIG_PATH}
 
 # REPLACE IP
-yq -i '.clusters[0].cluster.server = "https://'"$(hostname -I | awk '{print $1}')"':31643"' ${KUBECONFIG_PATH}
+yq -i '.clusters[0].cluster.server = "https://'"$(hostname -I | awk '{print $1}')"':'"${KUBE_API_PORT}"'"' ${KUBECONFIG_PATH}
 
 
 export KUBECONFIG=${KUBECONFIG_PATH}
