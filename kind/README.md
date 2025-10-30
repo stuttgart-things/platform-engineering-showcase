@@ -2,6 +2,26 @@
 
 ## CREATE
 
+<details><summary>GENERATE CLUSTER CONFIG</summary>
+
+```
+IP=$(hostname -I | awk '{print $1}')
+KUBE_API_PORT=31943
+CLUSTER_NAME=kind-demo
+
+kcl run oci://ghcr.io/stuttgart-things/k8s-kind-cluster \
+-D portRangeStart=32100 \
+-D portRangeCount=2 \
+-D clusterName=${CLUSTER_NAME} \
+-D apiServerAddress=${IP} \
+-D 'registryMirrors=["https://docker.harbor.idp.kubermatic.sva.dev"]' \
+-D apiServerPort=${KUBE_API_PORT} > /tmp/cluster.yaml
+```
+
+
+</details>
+
+
 <details><summary>CREATE CLUSTER</summary>
 
 ```bash
