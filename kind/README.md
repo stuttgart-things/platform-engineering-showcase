@@ -49,6 +49,12 @@ kubectl get nodes
 <details><summary>DEPLOY CLUSTER-INFRA</summary>
 
 ```bash
+kcl run oci://ghcr.io/stuttgart-things/helmfile-kind \
+-D apps=cilium,cert_manager \
+-D cilium_configure_lb=True \
+-D ciliumClusterName=bla \
+-o /tmp/kind-infra.yaml
+
 ## DEPLOY CLUSTER-INFRA
 export KUBECONFIG=${KUBECONFIG_PATH}
 export HELMFILE_CACHE_HOME=/tmp/helm-cache
@@ -56,13 +62,45 @@ export HELMFILE_CACHE_HOME=/tmp/helm-cache
 helmfile init --force
 
 kubectl apply -k https://github.com/stuttgart-things/helm/infra/crds/cilium
+kubectl apply -k https://github.com/stuttgart-things/helm/infra/crds/cert-manager
 
-helmfile apply -f infra.yaml
+helmfile apply -f /tmp/kind-infra.yaml
 
 kubectl get nodes
 ```
 
 </details>
+
+<details><summary>CREATE KUBECONFIG SECRET ON VAULT</summary>
+
+```bash
+curl \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  --request POST \
+  --data @<(cat <<EOF
+{
+  "data": {
+    "kubeconfig": "$(base64 -w0 < ${KUBECONFIG_PATH})"
+  }
+}
+EOF
+) \
+  $VAULT_ADDR/v1/secrets/data/kubeconfigs/kv/kind-demo
+```
+
+</details>
+
+<details><summary>READ IT BACK</summary>
+
+```bash
+curl -s \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  $VAULT_ADDR/v1/kubeconfigs/data/kv/demo-infra \
+  | jq -r .data.data.kubeconfig | base64 -d > ./demo-infra.kubeconfig
+```
+
+</details>
+
 
 <details><summary>DEPLOY VCLUSTER</summary>
 
@@ -114,9 +152,7 @@ loft/vcluster --version 0.29.0  \
 --values vcluster.yaml
 ```
 
-
 </details>
-
 
 <details><summary>DESTROY CLUSTER</summary>
 
@@ -124,3 +160,5 @@ loft/vcluster --version 0.29.0  \
 # DELETE
 kind delete clusters platform-cluster
 ```
+
+</details>

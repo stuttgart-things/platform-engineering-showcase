@@ -1,0 +1,27 @@
+---
+version: 3
+
+tasks:
+  get-images-namespace:
+    desc: Get all images from a specific namespace
+    cmds:
+      - |
+        SELECTED_NAMESPACE=$(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | gum choose --header "Select the Namespace to use for the pipeline run")
+        echo "Selected Namespace: ${SELECTED_NAMESPACE}"
+
+        kubectl get pods -n ${SELECTED_NAMESPACE} -o jsonpath='{range .items[*]}{.spec.containers[*].image}{"\n"}{.spec.initContainers[*].image}{"\n"}{end}' | sort -u
+
+  import-rke2-ctr:
+    desc: Import selected container images into rke cluster w/ ctr
+    vars:
+      CTR_BIN: /var/lib/rancher/rke2/bin/ctr
+      ADDRESS: /run/k3s/containerd/containerd.sock
+      NAMESPACE: k8s.io
+      PLATFORM: linux/amd64
+      FILES: "*.tar"
+    cmds:
+      - |
+        for f in $(gum choose --no-limit ${FILES}); do
+          echo "📦 Importing $f..."
+          sudo ${CTR_BIN} --address ${ADDRESS} --namespace ${NAMESPACE} images import --platform ${PLATFORM} "$f" --digest
+        done
