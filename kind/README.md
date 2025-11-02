@@ -74,18 +74,15 @@ kubectl get nodes
 <details><summary>CREATE KUBECONFIG SECRET ON VAULT</summary>
 
 ```bash
-curl \
-  --header "X-Vault-Token: $VAULT_TOKEN" \
-  --request POST \
-  --data @<(cat <<EOF
+curl   --header "X-Vault-Token: $VAULT_TOKEN"   --request POST   --data @<(cat <<EOF
 {
   "data": {
-    "kubeconfig": "$(base64 -w0 < ${KUBECONFIG_PATH})"
+    "kubeconfig": $(cat ${KUBECONFIG_PATH} | jq -Rs .)
   }
 }
 EOF
-) \
-  $VAULT_ADDR/v1/secrets/data/kubeconfigs/kv/kind-demo
+
+)   $VAULT_ADDR/v1/kubeconfigs/data/kv/demo-infra
 ```
 
 </details>
@@ -93,14 +90,44 @@ EOF
 <details><summary>READ IT BACK</summary>
 
 ```bash
-curl -s \
-  --header "X-Vault-Token: $VAULT_TOKEN" \
-  $VAULT_ADDR/v1/kubeconfigs/data/kv/demo-infra \
-  | jq -r .data.data.kubeconfig | base64 -d > ./demo-infra.kubeconfig
+curl -s   --header "X-Vault-Token: $VAULT_TOKEN"   $VAULT_ADDR/v1/kubeconfigs/data/kv/kind-demo   | jq -r .data.data.kubeconfig
 ```
 
 </details>
 
+<details><summary>ADD KIND CLUSTER TO CROSSPLANE</summary>
+
+```bash
+kcl run --quiet oci://ghcr.io/stuttgart-things/xplane-base -D 'params={
+    "oxr": {
+      "spec": {
+        "name": "prod",
+        "enableVaultSecret": {
+          "enabled": true,
+          "name": "kind-demo",
+          "namespace": "default",
+          "mount": "kubeconfigs",
+          "path": "kv/kind-demo",
+          "authRef": "dev",
+          "refreshAfter": "10s",
+          "destinationSecretName": "kind-demo"
+        },
+        "enableHelmProvider": {
+          "enabled": true
+        },
+        "enableKubernetesProvider": {
+          "enabled": true
+        },
+        "connectionSecret": {
+          "namespace": "default",
+          "name": "kind-demo"
+        }
+      }
+    }
+  }' --format yaml | grep -A 1000 "^items:" | sed 's/^- /---\n/' | sed '1d' | sed 's/^  //' | kubectl apply -f -
+```
+
+</details>
 
 <details><summary>DEPLOY VCLUSTER</summary>
 
