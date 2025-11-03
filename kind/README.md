@@ -129,7 +129,31 @@ kcl run --quiet oci://ghcr.io/stuttgart-things/xplane-base -D 'params={
 
 </details>
 
-<details><summary>DEPLOY VCLUSTER</summary>
+<details><summary>DEPLOY VAULT AUTH</summary>
+
+```bash
+kcl run oci://ghcr.io/stuttgart-things/xplane-vault-config -D params='{
+  "oxr": {
+    "spec": {
+      "clusterName": "prod",
+      "csiEnabled": true,
+      "vsoEnabled": true,
+      "esoEnabled": true,
+      "esoChartVersion": "0.20.2",
+      "k8sAuths": [
+          {"name": "vault-auth-app1", "namespace": "app1"},
+          {"name": "vault-auth-app2", "namespace": "app2"}
+      ]
+    }
+  }
+}' --format yaml | grep -A 1000 "^items:" | sed 's/^- /---\n/' | sed '1d' | sed 's/^  //' | kubectl apply -f -
+```
+
+</details>
+
+
+
+<details><summary>DEPLOY VCLUSTER (HELM)</summary>
 
 ```bash
 # CREATE VALUES
@@ -180,6 +204,51 @@ loft/vcluster --version 0.29.0  \
 ```
 
 </details>
+
+```bash
+kcl run --quiet oci://ghcr.io/stuttgart-things/xplane-vcluster:0.29.2 -D params='{
+  "oxr": {
+    "spec": {
+      "name": "vcluster-k3s-tink3",
+      "version": "0.29.0",
+      "clusterName": "k3s-tink1",
+      "targetNamespace": "vcluster-k3s-tink3",
+      "storageClass": "local-path",
+      "bindAddress": "0.0.0.0",
+      "proxyPort": 8443,
+      "nodePort": 32455,
+      "extraSANs": [
+        "test-k3s1.labul.sva.de",
+        "10.31.103.23",
+        "localhost"
+      ],
+      "serverUrl": "https://10.31.103.23:32455",
+      "additionalSecrets": [
+        {
+          "name": "vc-vcluster-k3s-tink3-crossplane",
+          "namespace": "vcluster-k3s-tink3",
+          "context": "vcluster-crossplane-context",
+          "server": "https://10.31.103.23:32455"
+        }
+      ],
+      "connectionSecret": {
+        "name": "vcluster-k3s-tink3-connection",
+        "namespace": "crossplane-system",
+        "vclusterSecretName": "vc-vcluster-k3s-tink3",
+        "vclusterSecretNamespace": "vcluster-k3s-tink3"
+      },
+      "pushSecret": {
+        "enabled": true,
+        "name": "pushsecret-vcluster-k3s-tink3",
+        "namespace": "default",
+        "clusterName": "k3s-tink1",
+        "secretStoreRef": "vault-backend-kubeconfigs",
+        "refreshInterval": "1m"
+      }
+    }
+  }
+}' --format yaml | grep -A 1000 "^items:" | sed 's/^- /---\n/' | sed '1d' | sed 's/^  //' | kubectl apply -f -
+```
 
 <details><summary>DESTROY CLUSTER</summary>
 
