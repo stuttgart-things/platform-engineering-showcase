@@ -1,0 +1,71 @@
+---
+version: "3"
+vars:
+  ALL_COMPOSE_FILES: "proxy.yaml,whoami/whoami.yaml"
+
+tasks:
+  do:
+    desc: Choose a docker-compose file and start/stop/follow logs interactively
+    silent: true
+    cmds:
+      - task: status
+      - |
+        # Convert ALL_COMPOSE_FILES to newline list for gum
+        COMPOSE_FILES=$(echo "{{.ALL_COMPOSE_FILES}}" | tr ',' '\n')
+
+        # Choose a file interactively
+        FILE=$(echo "$COMPOSE_FILES" | gum choose --header "Select a docker-compose stack:")
+
+        # Determine project name (directory or root filename)
+        DIR=$(dirname "$FILE")
+        if [ "$DIR" = "." ]; then
+          PROJECT=$(basename "$FILE" | sed 's/.yaml$//')
+        else
+          PROJECT=$(basename "$DIR")
+        fi
+
+        # Choose action
+        ACTION=$(gum choose "up" "down" "logs" --header "Select action for $PROJECT stack:")
+
+        # Run docker-compose based on action
+        case "$ACTION" in
+          up)
+            echo "Starting stack $PROJECT..."
+            docker compose -f "$FILE" -p "$PROJECT" up -d
+            ;;
+          down)
+            echo "Stopping stack $PROJECT..."
+            docker compose -f "$FILE" -p "$PROJECT" down
+            ;;
+          logs)
+            echo "Showing logs for $PROJECT..."
+            docker compose -f "$FILE" -p "$PROJECT" logs -f
+            ;;
+        esac
+
+  status:
+    desc: Show status of all stacks defined in ALL_COMPOSE_FILES
+    silent: true
+    cmds:
+      - |
+        for FILE in $(echo "{{.ALL_COMPOSE_FILES}}" | tr ',' '\n'); do
+          DIR=$(dirname "$FILE")
+          if [ "$DIR" = "." ]; then
+            PROJECT=$(basename "$FILE" | sed 's/.yaml$//')
+          else
+            PROJECT=$(basename "$DIR")
+          fi
+          echo "=== Status for $PROJECT ($FILE) ==="
+          docker compose -f "$FILE" -p "$PROJECT" ps
+          echo ""
+        done
+
+  default:
+    desc: Select a task to run
+    cmds:
+      - |
+        # Extract task names (keep internal colons, remove only trailing colon)
+        task_name=$(task -l | awk '/^\*/ {print $2}' | sed 's/:$//' | gum choose)
+
+        # Run the selected task
+        [ -n "$task_name" ] && task "$task_name"
