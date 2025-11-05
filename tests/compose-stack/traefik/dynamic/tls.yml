@@ -1,0 +1,6 @@
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/whoami.whatever.com.crt
+      keyFile: /etc/traefik/certs/whoami.whatever.com.key
+    - certFile: /etc/traefik/certs/traefik.whatever.com.crt
+      keyFile: /etc/traefik/certs/traefik.whatever.com.key

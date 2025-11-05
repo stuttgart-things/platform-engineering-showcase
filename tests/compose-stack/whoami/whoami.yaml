@@ -1,0 +1,23 @@
+---
+services:
+  whoami:
+    image: traefik/whoami
+    labels:
+      - "traefik.enable=true"
+      # HTTP router (redirects to HTTPS)
+      - "traefik.http.routers.whoami.rule=Host(`whoami.whatever.com`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=whoami-redirect"
+      # HTTPS router
+      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.whatever.com`)"
+      - "traefik.http.routers.whoami-secure.entrypoints=websecure"
+      - "traefik.http.routers.whoami-secure.tls=true"
+      # Redirect middleware
+      - "traefik.http.middlewares.whoami-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.whoami-redirect.redirectscheme.permanent=true"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true

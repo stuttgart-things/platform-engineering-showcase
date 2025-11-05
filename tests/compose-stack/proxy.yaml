@@ -1,0 +1,41 @@
+---
+services:
+  traefik:
+    image: traefik:v3.5.4
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--api.dashboard=true"
+    labels:
+      - "traefik.enable=true"
+      # Dashboard HTTPS
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.whatever.com`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      # Dashboard HTTP redirect
+      - "traefik.http.routers.dashboard-http.rule=Host(`traefik.whatever.com`)"
+      - "traefik.http.routers.dashboard-http.entrypoints=web"
+      - "traefik.http.routers.dashboard-http.middlewares=dashboard-redirect"
+      # Basic auth (replace with your hash)
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$sMSPuqtDqe/c/ucECl34qeFRXuT7nIvUiQ.SxdKBN47.w6MTLEbX."
+      # Redirect middleware
+      - "traefik.http.middlewares.dashboard-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.dashboard-redirect.redirectscheme.permanent=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/certs:/etc/traefik/certs:ro
+networks:
+  web:
+    external: true
