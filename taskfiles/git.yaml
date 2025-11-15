@@ -46,6 +46,17 @@ tasks:
       - gh pr merge $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --auto --rebase --delete-branch
       - git checkout main && git pull
 
+  issue:
+    desc: Create github issue
+    cmds:
+      - |
+        dagger call -m github.com/stuttgart-things/blueprints/repository-linting@v1.21.0 \
+        create-issue \
+        --repository $(gum input --header="REPOSITORY" --value "stuttgart-things/") \
+        --token env:GITHUB_TOKEN \
+        --content "$(gum input --header="CONTENT" --value "add issue for: ")" \
+        --model=$(gum input --header="AI MODEL" --value "gemini-2.5-flash")
+
   branch:
     desc: Create branch from main
     cmds:
@@ -114,3 +125,28 @@ tasks:
         branches=$(git branch -a | grep -v 'remotes')
         branch=$(printf "%s\n" "${branches[@]}" | gum choose)
         git checkout ${branch} && git pull
+
+  tag:
+    desc: Tag repo
+    cmds:
+      - task: commit
+      - |
+        echo "Enter to be created (remote) tag on the repository:"
+        read TAG_NAME;
+        git tag -a ${TAG_NAME} -m 'updated for ${TAG_NAME} on {{ .DATE }}'
+        git push origin --tags
+
+  default:
+    desc: Default task is select & do (work)
+    cmds:
+      - task do
+
+  do:
+    desc: Select a task to run
+    cmds:
+      - |
+        # Extract task names (keep internal colons, remove only trailing colon)
+        task_name=$(task -l | awk '/^\*/ {print $2}' | sed 's/:$//' | gum choose)
+
+        # Run the selected task
+        [ -n "$task_name" ] && task "$task_name"
