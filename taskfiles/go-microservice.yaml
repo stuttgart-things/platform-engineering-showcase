@@ -1,9 +1,5 @@
 ---
 version: 3
-vars:
-  CODE_DIR:
-    sh: |
-      gum input --placeholder "Source code dir" --value $(pwd)
 
 tasks:
   static-lint-all:
@@ -12,6 +8,9 @@ tasks:
       MODULE: github.com/stuttgart-things/blueprints/repository-linting@v1.21.0
       FUNCTION: validate-multiple-technologies
       EXPORT_PATH: /tmp/all-findings.txt
+      CODE_DIR:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
     cmds:
       - |
         dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
@@ -24,6 +23,10 @@ tasks:
       MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
       FUNCTION: run-static-stage
       EXPORT_PATH: /tmp/all-findings.txt
+      CODE_DIR:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+
     cmds:
       - |
         dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
