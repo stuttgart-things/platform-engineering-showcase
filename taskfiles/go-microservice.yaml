@@ -1,0 +1,18 @@
+---
+version: 3
+
+tasks:
+  static-lint-all:
+    desc: Lint/validate multiple technologies
+    vars:
+      MODULE: github.com/stuttgart-things/blueprints/repository-linting@v1.21.0
+      FUNCTION: validate-multiple-technologies
+      CODE_DIR:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+      EXPORT_PATH: /tmp/all-findings.txt
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
+        --src {{ .CODE_DIR }} \
+        export --path {{ .EXPORT_PATH }}
