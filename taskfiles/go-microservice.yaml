@@ -1,5 +1,9 @@
 ---
 version: 3
+vars:
+  CODE_DIR:
+    sh: |
+      gum input --placeholder "Source code dir" --value $(pwd)
 
 tasks:
   static-lint-all:
@@ -7,12 +11,26 @@ tasks:
     vars:
       MODULE: github.com/stuttgart-things/blueprints/repository-linting@v1.21.0
       FUNCTION: validate-multiple-technologies
-      CODE_DIR:
-        sh: |
-          gum input --placeholder "Source code dir" --value $(pwd)
       EXPORT_PATH: /tmp/all-findings.txt
     cmds:
       - |
         dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
         --src {{ .CODE_DIR }} \
         export --path {{ .EXPORT_PATH }}
+
+  run-all-static-tests:
+    desc: Lint/validate multiple technologies
+    vars:
+      MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
+      FUNCTION: run-static-stage
+      EXPORT_PATH: /tmp/all-findings.txt
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
+        --src {{ .CODE_DIR }} \
+        --lintCanFail=$(gum confirm --prompt "Allow lint to fail?") \
+        --security-scan=$(gum confirm --prompt "Enable security scan?") \
+        --test=$(gum confirm --prompt "Enable tests?") \
+        --progress plain -vv \
+        export --path=/tmp/$(basename {{ .CODE_DIR }})-static-tests-findings.txt
+        code /tmp/$(basename {{ .CODE_DIR }})-static-tests-findings.txt
