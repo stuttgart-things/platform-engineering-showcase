@@ -32,7 +32,6 @@ tasks:
         dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
         --src {{ .CODE_DIR }} \
         --lintCanFail=$(gum choose "true" "false" --header "Allow lint to fail?") \
-        --security-scan=$(gum choose "true" "false" --header "Enable security scan?") \
         --test=$(gum choose "true" "false" --header "Enable tests?") \
         --progress plain -vv \
         export --path=/tmp/$(basename {{ .CODE_DIR }})-static-tests-findings.txt
