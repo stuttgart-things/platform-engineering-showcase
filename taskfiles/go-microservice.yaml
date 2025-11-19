@@ -20,19 +20,89 @@ tasks:
   run-all-static-tests:
     desc: Lint/validate multiple technologies
     vars:
-      MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
+      CI_MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
       FUNCTION: run-static-stage
-      EXPORT_PATH: /tmp/all-findings.txt
-      CODE_DIR:
+      SRC:
         sh: |
           gum input --placeholder "Source code dir" --value $(pwd)
-
+      TEST:
+        sh: |
+          gum choose "true" "false" --header "Enable tests?"
+      REPORT_PATH: /tmp/all-findings.txt
     cmds:
       - |
-        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
-        --src {{ .CODE_DIR }} \
-        --lintCanFail=$(gum choose "true" "false" --header "Allow lint to fail?") \
-        --test=$(gum choose "true" "false" --header "Enable tests?") \
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        --lintCanFail=true \
+        --go-Version=1.25.4 \
+        --test={{ .TEST }} \
         --progress plain -vv \
-        export --path=/tmp/$(basename {{ .CODE_DIR }})-static-tests-findings.txt
-        code /tmp/$(basename {{ .CODE_DIR }})-static-tests-findings.txt
+        export --path={{ .REPORT_PATH }}
+        cat {{ .REPORT_PATH }}
+
+  run-build-stage:
+    desc: Run build stage for Go microservice (non-interactive, for calling from other taskfiles)
+    vars:
+      CI_MODULE: '{{.CI_MODULE | default "github.com/stuttgart-things/blueprints/go-microservice@v1.21.0"}}'
+      FUNCTION: '{{.FUNCTION | default "run-build-stage"}}'
+      SRC: '{{.SRC | default .USER_WORKING_DIR}}'
+      KO_BUILD: '{{.KO_BUILD | default "false"}}'
+      BIN_NAME: '{{.BIN_NAME | default "app"}}'
+      LDFLAGS: '{{.LDFLAGS | default ""}}'
+      KO_PUSH: '{{.KO_PUSH | default "false"}}'
+      KO_REPO: '{{.KO_REPO | default "ghcr.io/your-org/your-repo"}}'
+      EXPORT_PATH: '{{.EXPORT_PATH | default "/tmp/microservices/build-output/"}}'
+    cmds:
+      - |
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        --ko-build={{ .KO_BUILD }} \
+        --bin-name {{ .BIN_NAME }} \
+        --ldflags "{{ .LDFLAGS }}" \
+        --token=env:GITHUB_TOKEN \
+        --ko-push={{ .KO_PUSH }} \
+        --ko-repo {{ .KO_REPO }} \
+        --progress plain -vv \
+        export --path={{ .EXPORT_PATH }}
+
+  run-build-stage-interactive:
+    desc: Run build stage for Go microservice with ldflags and ko build
+    vars:
+      CI_MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
+      FUNCTION: run-build-stage
+      SRC:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+      KO_BUILD:
+        sh: |
+          gum choose "true" "false" --header "Enable ko build?"
+      BIN_NAME:
+        sh: |
+          gum input --placeholder "Binary name" --value "app"
+      VERSION:
+        sh: |
+          gum input --placeholder "Version" --value "1.0.0"
+      COMMIT:
+        sh: |
+          gum input --placeholder "Commit hash" --value $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+      KO_PUSH:
+        sh: |
+          gum choose "true" "false" --header "Push to registry?"
+      KO_REPO:
+        sh: |
+          gum input --placeholder "Ko repository" --value "ghcr.io/your-org/your-repo"
+      EXPORT_PATH:
+        sh: |
+          gum input --placeholder "Export path" --value "/tmp/microservices/build-output/"
+    cmds:
+      - |
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        --ko-build={{ .KO_BUILD }} \
+        --bin-name {{ .BIN_NAME }} \
+        --ldflags "" \
+        --token=env:GITHUB_TOKEN \
+        --ko-push={{ .KO_PUSH }} \
+        --ko-repo {{ .KO_REPO }} \
+        --progress plain -vv \
+        export --path={{ .EXPORT_PATH }}
