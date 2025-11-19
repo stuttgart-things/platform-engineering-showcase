@@ -110,6 +110,7 @@ tasks:
       BIN_NAME: '{{.BIN_NAME | default "app"}}'
       LDFLAGS: '{{.LDFLAGS | default ""}}'
       KO_PUSH: '{{.KO_PUSH | default "false"}}'
+      KO_VERSION: '{{.KO_VERSION | default "v0.18.0"}}'
       KO_REPO: '{{.KO_REPO | default "ghcr.io/your-org/your-repo"}}'
       EXPORT_PATH: '{{.EXPORT_PATH | default "/tmp/microservices/build-output/"}}'
     cmds:
@@ -120,6 +121,7 @@ tasks:
         --bin-name {{ .BIN_NAME }} \
         --ldflags "{{ .LDFLAGS }}" \
         --token=env:GITHUB_TOKEN \
+        --ko-version={{ .KO_VERSION }} \
         --ko-push={{ .KO_PUSH }} \
         --ko-repo {{ .KO_REPO }} \
         --progress plain -vv \
