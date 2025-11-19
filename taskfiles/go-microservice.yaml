@@ -17,24 +17,22 @@ tasks:
         --src {{ .CODE_DIR }} \
         export --path {{ .EXPORT_PATH }}
 
-  run-all-static-tests:
-    desc: Lint/validate multiple technologies
+  run-lint-stage:
+    desc: Lint/validate multiple technologies (non-interactive, for calling from other taskfiles)
     vars:
-      CI_MODULE: github.com/stuttgart-things/blueprints/go-microservice@v1.21.0
-      FUNCTION: run-static-stage
-      SRC:
-        sh: |
-          gum input --placeholder "Source code dir" --value $(pwd)
-      TEST:
-        sh: |
-          gum choose "true" "false" --header "Enable tests?"
-      REPORT_PATH: /tmp/all-findings.txt
+      CI_MODULE: '{{.CI_MODULE | default "github.com/stuttgart-things/blueprints/go-microservice@v1.21.0"}}'
+      FUNCTION: '{{.FUNCTION | default "run-static-stage"}}'
+      SRC: '{{.SRC | default .USER_WORKING_DIR}}'
+      TEST: '{{.TEST | default "false"}}'
+      GO_VERSION: '{{.GO_VERSION | default "1.25.4"}}'
+      LINT_CAN_FAIL: '{{.LINT_CAN_FAIL | default "true"}}'
+      REPORT_PATH: '{{.REPORT_PATH | default "/tmp/all-findings.txt"}}'
     cmds:
       - |
         dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
         --src {{ .SRC }} \
-        --lintCanFail=true \
-        --go-Version=1.25.4 \
+        --lintCanFail={{ .LINT_CAN_FAIL }} \
+        --go-Version={{ .GO_VERSION }} \
         --test={{ .TEST }} \
         --progress plain -vv \
         export --path={{ .REPORT_PATH }}
