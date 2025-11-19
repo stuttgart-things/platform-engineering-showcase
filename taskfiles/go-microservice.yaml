@@ -2,21 +2,6 @@
 version: 3
 
 tasks:
-  static-lint-all:
-    desc: Lint/validate multiple technologies
-    vars:
-      MODULE: github.com/stuttgart-things/blueprints/repository-linting@v1.21.0
-      FUNCTION: validate-multiple-technologies
-      EXPORT_PATH: /tmp/all-findings.txt
-      CODE_DIR:
-        sh: |
-          gum input --placeholder "Source code dir" --value $(pwd)
-    cmds:
-      - |
-        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
-        --src {{ .CODE_DIR }} \
-        export --path {{ .EXPORT_PATH }}
-
   run-lint-stage:
     desc: Lint/validate multiple technologies (non-interactive, for calling from other taskfiles)
     vars:
@@ -37,6 +22,83 @@ tasks:
         --progress plain -vv \
         export --path={{ .REPORT_PATH }}
         cat {{ .REPORT_PATH }}
+
+  run-lint-stage-interactive:
+    desc: Lint/validate multiple technologies (interactive with prompts)
+    vars:
+      CI_MODULE:
+        sh: |
+          gum input --placeholder "CI Module" --value "github.com/stuttgart-things/blueprints/go-microservice@v1.21.0"
+      FUNCTION:
+        sh: |
+          gum input --placeholder "Function name" --value "run-static-stage"
+      SRC:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+      TEST:
+        sh: |
+          gum choose "true" "false" --header "Run tests?"
+      GO_VERSION:
+        sh: |
+          gum input --placeholder "Go version" --value "1.25.4"
+      LINT_CAN_FAIL:
+        sh: |
+          gum choose "true" "false" --header "Allow lint to fail?"
+      REPORT_PATH:
+        sh: |
+          gum input --placeholder "Report path" --value "/tmp/all-findings.txt"
+    cmds:
+      - |
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        --lintCanFail={{ .LINT_CAN_FAIL }} \
+        --go-Version={{ .GO_VERSION }} \
+        --test={{ .TEST }} \
+        --progress plain -vv \
+        export --path={{ .REPORT_PATH }}
+        cat {{ .REPORT_PATH }}
+
+  run-go-tests:
+    desc: Run Go tests via Dagger CI (non-interactive, for calling from other taskfiles)
+    vars:
+      CI_MODULE: '{{.CI_MODULE | default "github.com/stuttgart-things/dagger/homerun@v0.42.0"}}'
+      FUNCTION: '{{.FUNCTION | default "run-test-with-redis"}}'
+      SRC: '{{.SRC | default .USER_WORKING_DIR}}'
+      TEST_PATH: '{{.TEST_PATH | default "."}}'
+      GO_VERSION: '{{.GO_VERSION | default "1.25.4"}}'
+    cmds:
+      - |
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --source {{ .SRC }} \
+        --test-path={{ .TEST_PATH }} \
+        --go-Version={{ .GO_VERSION }} \
+        --progress plain -vv
+
+  run-go-tests-interactive:
+    desc: Run Go tests via Dagger CI (interactive with prompts)
+    vars:
+      CI_MODULE:
+        sh: |
+          gum input --placeholder "CI Module" --value "github.com/stuttgart-things/dagger/homerun@v0.42.0"
+      FUNCTION:
+        sh: |
+          gum input --placeholder "Function name" --value "run-test-with-redis"
+      SRC:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+      TEST_PATH:
+        sh: |
+          gum input --placeholder "Test path" --value "."
+      GO_VERSION:
+        sh: |
+          gum input --placeholder "Go version" --value "1.25.4"
+    cmds:
+      - |
+        dagger call -m {{ .CI_MODULE }} {{ .FUNCTION }} \
+        --source {{ .SRC }} \
+        --test-path={{ .TEST_PATH }} \
+        --go-Version={{ .GO_VERSION }} \
+        --progress plain -vv
 
   run-build-stage:
     desc: Run build stage for Go microservice (non-interactive, for calling from other taskfiles)

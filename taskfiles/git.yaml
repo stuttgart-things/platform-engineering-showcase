@@ -7,6 +7,42 @@ vars:
     sh: if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then echo $(git rev-parse --abbrev-ref HEAD); else echo main ; fi
 
 tasks:
+  run-validation-stage:
+    desc: Lint/validate multiple technologies (non-interactive, for calling from other taskfiles)
+    vars:
+      MODULE: '{{.MODULE | default "github.com/stuttgart-things/blueprints/repository-linting@v1.21.0"}}'
+      FUNCTION: '{{.FUNCTION | default "validate-multiple-technologies"}}'
+      SRC: '{{.SRC | default .USER_WORKING_DIR}}'
+      EXPORT_PATH: '{{.EXPORT_PATH | default "/tmp/all-findings.txt"}}'
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        export --path {{ .EXPORT_PATH }}
+        cat {{ .EXPORT_PATH }}
+
+  run-validation-stage-interactive:
+    desc: Lint/validate multiple technologies (interactive with prompts)
+    vars:
+      MODULE:
+        sh: |
+          gum input --placeholder "Module" --value "github.com/stuttgart-things/blueprints/repository-linting@v1.21.0"
+      FUNCTION:
+        sh: |
+          gum input --placeholder "Function name" --value "validate-multiple-technologies"
+      SRC:
+        sh: |
+          gum input --placeholder "Source code dir" --value $(pwd)
+      EXPORT_PATH:
+        sh: |
+          gum input --placeholder "Export path" --value "/tmp/all-findings.txt"
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} {{ .FUNCTION }} \
+        --src {{ .SRC }} \
+        export --path {{ .EXPORT_PATH }}
+        cat {{ .EXPORT_PATH }}
+
   commit:
     desc: Commit + push code into branch
     deps:
