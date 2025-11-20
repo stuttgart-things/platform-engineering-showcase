@@ -168,3 +168,156 @@ tasks:
         --ko-repo {{ .KO_REPO }} \
         --progress plain -vv \
         export --path={{ .EXPORT_PATH }}
+
+  lint-go:
+    desc: Lint Go project (non-interactive, for calling from other taskfiles)
+    vars:
+      MODULE: '{{.MODULE | default "github.com/stuttgart-things/dagger/go@v0.42.0"}}'
+      SRC: '{{.SRC | default "."}}'
+      TIMEOUT: '{{.TIMEOUT | default "300s"}}'
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} lint \
+        --src "{{ .SRC }}" \
+        --timeout {{ .TIMEOUT }} \
+        --progress plain -vv
+
+  lint-go-interactive:
+    desc: Lint Go project (interactive with prompts)
+    vars:
+      MODULE:
+        sh: |
+          gum input --placeholder "Dagger module" --value "github.com/stuttgart-things/dagger/go@v0.42.0"
+      SRC:
+        sh: |
+          gum input --placeholder "Source directory" --value "."
+      TIMEOUT:
+        sh: |
+          gum input --placeholder "Timeout (e.g., 300s)" --value "300s"
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} lint \
+        --src "{{ .SRC }}" \
+        --timeout {{ .TIMEOUT }} \
+        --progress plain -vv
+
+  build-binary:
+    desc: Build Go binary with custom flags (non-interactive, for calling from other taskfiles)
+    vars:
+      MODULE: '{{.MODULE | default "github.com/stuttgart-things/dagger/go@v0.42.0"}}'
+      SRC: '{{.SRC | default "."}}'
+      OS: '{{.OS | default "linux"}}'
+      ARCH: '{{.ARCH | default "amd64"}}'
+      LDFLAGS: '{{.LDFLAGS | default ""}}'
+      GO_MAIN_FILE: '{{.GO_MAIN_FILE | default "main.go"}}'
+      BIN_NAME: '{{.BIN_NAME | default "myapp"}}'
+      EXPORT_PATH: '{{.EXPORT_PATH | default "/tmp/go/build/"}}'
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} build-binary \
+        --src "{{ .SRC }}" \
+        --os {{ .OS }} \
+        --arch {{ .ARCH }} \
+        --ldflags "{{ .LDFLAGS }}" \
+        --go-main-file {{ .GO_MAIN_FILE }} \
+        --bin-name {{ .BIN_NAME }} \
+        export --path={{ .EXPORT_PATH }} \
+        --progress plain -vv
+
+  build-binary-interactive:
+    desc: Build Go binary with custom flags (interactive with prompts)
+    vars:
+      MODULE:
+        sh: |
+          gum input --placeholder "Dagger module" --value "github.com/stuttgart-things/dagger/go@v0.42.0"
+      SRC:
+        sh: |
+          gum input --placeholder "Source directory" --value "."
+      OS:
+        sh: |
+          gum choose "linux" "darwin" "windows" --header "Target OS"
+      ARCH:
+        sh: |
+          gum choose "amd64" "arm64" "arm" --header "Target architecture"
+      VERSION:
+        sh: |
+          gum input --placeholder "Version" --value "1.0.0"
+      BUILD_DATE:
+        sh: |
+          echo $(date -u +%Y-%m-%dT%H:%M:%SZ)
+      GO_MAIN_FILE:
+        sh: |
+          gum input --placeholder "Go main file" --value "main.go"
+      BIN_NAME:
+        sh: |
+          gum input --placeholder "Binary name" --value "myapp"
+      EXPORT_PATH:
+        sh: |
+          gum input --placeholder "Export path" --value "/tmp/go/build/"
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} build-binary \
+        --src "{{ .SRC }}" \
+        --os {{ .OS }} \
+        --arch {{ .ARCH }} \
+        --ldflags "cmd.version={{ .VERSION }}; cmd.date={{ .BUILD_DATE }}" \
+        --go-main-file {{ .GO_MAIN_FILE }} \
+        --bin-name {{ .BIN_NAME }} \
+        export --path={{ .EXPORT_PATH }} \
+        --progress plain -vv
+
+  ko-build:
+    desc: Build and push container with Ko (non-interactive, for calling from other taskfiles)
+    vars:
+      MODULE: '{{.MODULE | default "github.com/stuttgart-things/dagger/go@v0.42.0"}}'
+      SRC: '{{.SRC | default "."}}'
+      TOKEN_NAME: '{{.TOKEN_NAME | default "GITHUB_TOKEN"}}'
+      REPO: '{{.REPO | default "ko.local"}}'
+      BUILD_ARG: '{{.BUILD_ARG | default "."}}'
+      KO_VERSION: '{{.KO_VERSION | default "v0.18.0"}}'
+      PUSH: '{{.PUSH | default "true"}}'
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} ko-build \
+        --src {{ .SRC }} \
+        --token env:{{ .TOKEN_NAME }} \
+        --repo {{ .REPO }} \
+        --build-arg {{ .BUILD_ARG }} \
+        --ko-version {{ .KO_VERSION }} \
+        --push {{ .PUSH }} \
+        --progress plain -vv
+
+  ko-build-interactive:
+    desc: Build and push container with Ko (interactive with prompts)
+    vars:
+      MODULE:
+        sh: |
+          gum input --placeholder "Dagger module" --value "github.com/stuttgart-things/dagger/go@v0.42.0"
+      SRC:
+        sh: |
+          gum input --placeholder "Source directory" --value "."
+      TOKEN_NAME:
+        sh: |
+          gum input --placeholder "Token environment variable name" --value "GITHUB_TOKEN"
+      REPO:
+        sh: |
+          gum input --placeholder "Container repository (e.g., ghcr.io/stuttgart-things/myapp)" --value "ko.local"
+      BUILD_ARG:
+        sh: |
+          gum input --placeholder "Build argument (path to build)" --value "."
+      KO_VERSION:
+        sh: |
+          gum input --placeholder "Ko version" --value "v0.18.0"
+      PUSH:
+        sh: |
+          gum choose "true" "false" --header "Push to registry?"
+    cmds:
+      - |
+        dagger call -m {{ .MODULE }} ko-build \
+        --src {{ .SRC }} \
+        --token env:{{ .TOKEN_NAME }} \
+        --repo {{ .REPO }} \
+        --build-arg {{ .BUILD_ARG }} \
+        --ko-version {{ .KO_VERSION }} \
+        --push {{ .PUSH }} \
+        --progress plain -vv
