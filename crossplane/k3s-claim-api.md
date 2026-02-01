@@ -1,7 +1,7 @@
 # K3S BASED - CROSSPLANE CLUSTER
 
 <details open>
-<summary>Install claims</summary>
+<summary>INSTALL CLAIMS</summary>
 
 ```bash
 wget https://github.com/stuttgart-things/claims/releases/download/v0.1.0/claims_0.1.0_linux_amd64.tar.gz
