@@ -1,7 +1,7 @@
 # K3S BASED - FLUX/CROSSPLANE CLUSTER
 
 <details open>
-<summary>_RENDER FLUX CONFIG_</summary>
+<summary>INSTALL K3S</summary>
 
 ```bash
 export TASK_X_REMOTE_TASKFILES=1
@@ -87,10 +87,5 @@ ghcr.io/stuttgart-things/claim-machinery-api:v0.3.0
 ```
 
 </details>
-
-
-
-
-
 
 
