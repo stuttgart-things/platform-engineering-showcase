@@ -1,7 +1,7 @@
 # K3S BASED - FLUX/CROSSPLANE CLUSTER
 
 <details open>
-<summary>RENDER FLUX CONFIG</summary>
+<summary>_RENDER FLUX CONFIG_</summary>
 
 ```bash
 export TASK_X_REMOTE_TASKFILES=1
