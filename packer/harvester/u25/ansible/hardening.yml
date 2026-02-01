@@ -1,0 +1,14 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Disable root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
