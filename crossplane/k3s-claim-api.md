@@ -2,6 +2,17 @@
 
 <details open>
 <summary>RENDER FLUX CONFIG</summary>
+
+```bash
+export TASK_X_REMOTE_TASKFILES=1
+task --taskfile https://raw.githubusercontent.com/stuttgart-things/tasks/refs/heads/main/kubernetes/k3s.yaml install
+task --taskfile https://raw.githubusercontent.com/stuttgart-things/tasks/refs/heads/main/kubernetes/k3s.yaml cilium:install
+```
+
+</details>
+
+<details open>
+<summary>RENDER FLUX CONFIG</summary>
   
 ```bash
 dagger call -m github.com/stuttgart-things/dagger/kcl@v0.76.0 run \
