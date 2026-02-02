@@ -13,7 +13,8 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # TASKFILE + GUM
 ## on Ubuntu25:
-## sudo apt install gcc
+sudo apt install gcc
+sudo apt install -y build-essential
 brew install go-task/tap/go-task gum
 ```
 
