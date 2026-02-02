@@ -12,6 +12,17 @@ task --taskfile https://raw.githubusercontent.com/stuttgart-things/tasks/refs/he
 </details>
 
 <details open>
+<summary>INSTALL FLUX OPERATOR</summary>
+
+```bash
+helmfile init --force
+helmfile apply -f git::https://github.com/stuttgart-things/helm.git@cicd/flux-operator.yaml.gotmpl \
+--state-values-set version=0.28.0
+```
+
+</details>
+
+<details open>
 <summary>RENDER FLUX CONFIG</summary>
   
 ```bash
