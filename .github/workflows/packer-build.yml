@@ -29,8 +29,7 @@ on:
 jobs:
   packer-build:
     name: Build image with Packer
-    runs-on: sthings-air12
-
+    runs-on: kvm
     env:
       PACKER_LOG: 1
       PACKER_LOG_LEVEL: ${{ inputs.log_level }}
