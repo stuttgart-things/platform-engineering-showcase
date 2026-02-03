@@ -26,6 +26,8 @@ source "qemu" "ubuntu_cloud" {
   disk_compression = true
 
   efi_boot          = true
+  efi_firmware_code = "/usr/share/OVMF/OVMF_CODE_4M.fd"
+  efi_firmware_vars = "/usr/share/OVMF/OVMF_VARS_4M.fd"
 
   output_directory = var.output_location
 
