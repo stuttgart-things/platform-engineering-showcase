@@ -1,0 +1,60 @@
+name: Packer Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      packer_dir:
+        description: "Directory containing Packer configuration"
+        required: true
+        default: "harvester/packer/ubuntu25"
+        type: string
+
+      template:
+        description: "Packer template (file or directory)"
+        required: true
+        default: "."
+        type: string
+
+      var_file:
+        description: "Optional Packer var-file"
+        required: false
+        type: string
+
+      log_level:
+        description: "Packer log level (TRACE, DEBUG, INFO, WARN, ERROR)"
+        required: false
+        default: "INFO"
+        type: string
+
+jobs:
+  packer-build:
+    name: Build image with Packer
+    runs-on: sthings-air12
+
+    env:
+      PACKER_LOG: 1
+      PACKER_LOG_LEVEL: ${{ inputs.log_level }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show inputs
+        run: |
+          echo "Packer dir : ${{ inputs.packer_dir }}"
+          echo "Template   : ${{ inputs.template }}"
+          echo "Var file   : ${{ inputs.var_file }}"
+          echo "Log level  : ${{ inputs.log_level }}"
+
+      - name: Packer init
+        working-directory: ${{ inputs.packer_dir }}
+        run: packer init ${{ inputs.template }}
+
+      - name: Packer build
+        working-directory: ${{ inputs.packer_dir }}
+        run: |
+          if [ -n "${{ inputs.var_file }}" ]; then
+            packer build -var-file="${{ inputs.var_file }}" ${{ inputs.template }}
+          else
+            packer build ${{ inputs.template }}
+          fi

@@ -1,13 +1,3 @@
-
-variable "harvester_vip" {
-  type = string
-}
-
-variable "harvester_password" {
-  type = string
-  sensitive = true
-}
-
 variable "ubuntu_url" {
   type = string
   default = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
