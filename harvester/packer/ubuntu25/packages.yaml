@@ -1,0 +1,4 @@
+packages:
+  - qemu-guest-agent
+  - vim
+  - curl

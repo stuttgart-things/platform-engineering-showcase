@@ -1,21 +1,30 @@
+locals {
+  users_config    = yamldecode(file(var.users_file))
+  packages_config = yamldecode(file(var.packages_file))
+}
+
 source "file" "user_data" {
-  content = <<EOF
-#cloud-config
-ssh_pwauth: True
-package_update: true
-packages:
-- qemu-guest-agent
-password: superpassword
-chpasswd: { expire: False }
-ssh_pwauth: True
-runcmd:
-- - systemctl
-  - enable
-  - '--now'
-  - qemu-guest-agent.service
-- mkdir -p /var/lib/rancher/rke2-artifacts && wget https://get.rke2.io -O /var/lib/rancher/install.sh && chmod +x /var/lib/rancher/install.sh
-EOF
-  target  = "user-data"
+  content = format("#cloud-config\n%s", yamlencode({
+    ssh_pwauth     = true
+    package_update = true
+    packages       = local.packages_config.packages
+    password       = "superpassword" # pragma: allowlist secret
+    chpasswd       = { expire = false }
+    users = concat(
+      ["default"],
+      [for u in local.users_config.users : {
+        name                = u.name
+        groups              = try(u.groups, "sudo")
+        shell               = try(u.shell, "/bin/bash")
+        sudo                = try(u.sudo, "ALL=(ALL) NOPASSWD:ALL")
+        ssh_authorized_keys = u.ssh_authorized_keys
+      }]
+    )
+    runcmd = [
+      ["systemctl", "enable", "--now", "qemu-guest-agent.service"]
+    ]
+  }))
+  target = "user-data"
 }
 
 source "file" "meta_data" {

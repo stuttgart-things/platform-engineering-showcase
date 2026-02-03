@@ -20,19 +20,18 @@ on:
         required: false
         type: string
 
-      log_level:
-        description: "Packer log level (TRACE, DEBUG, INFO, WARN, ERROR)"
+      packer_log:
+        description: "Enable Packer debug logging"
         required: false
-        default: "INFO"
-        type: string
+        default: false
+        type: boolean
 
 jobs:
   packer-build:
     name: Build image with Packer
     runs-on: kvm
     env:
-      PACKER_LOG: 1
-      PACKER_LOG_LEVEL: ${{ inputs.log_level }}
+      PACKER_LOG: ${{ inputs.packer_log && 1 || 0 }}
 
     steps:
       - name: Checkout repository
@@ -43,7 +42,7 @@ jobs:
           echo "Packer dir : ${{ inputs.packer_dir }}"
           echo "Template   : ${{ inputs.template }}"
           echo "Var file   : ${{ inputs.var_file }}"
-          echo "Log level  : ${{ inputs.log_level }}"
+          echo "Packer log : ${{ inputs.packer_log }}"
 
       - name: Packer init
         working-directory: ${{ inputs.packer_dir }}

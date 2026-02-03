@@ -1,0 +1,13 @@
+users:
+  - name: admin
+    groups: sudo
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA_REPLACE_WITH_REAL_KEY admin@example.com
+  - name: developer
+    groups: sudo
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA_REPLACE_WITH_REAL_KEY developer@example.com
