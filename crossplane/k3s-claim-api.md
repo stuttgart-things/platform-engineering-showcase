@@ -54,8 +54,8 @@ dagger call -m github.com/stuttgart-things/blueprints/crossplane-configuration a
 --deploy-to-cluster=false \
 --kubeconfig-cluster file:///home/sthings/.kube/k3s \
 --encrypt-with-^Cps=true \
---age-public-key=env:AGE_PUB export \
---path=/tmp/output.yaml \
+--age-public-key=env:AGE_PUB \
+export --path=/tmp/output.yaml \
 --progress plain -vv
 ```
 
