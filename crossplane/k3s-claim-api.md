@@ -49,14 +49,24 @@ export -path ./flux-instance.yaml
 <summary>ADD CLUSTER TO CROSSPLANE (SOPS ENCRYPTED)</summary>
 
 ```bash
-dagger call -m github.com/stuttgart-things/blueprints/crossplane-configuration add-cluster \
+dagger call -m github.com/stuttgart-things/blueprints/crossplane-configuration@v1.52.0 add-cluster \
 --clusterName=in-cluster \
 --deploy-to-cluster=false \
+--useClusterProviderConfig=true \
+--providers="kubernetes,helm" \
 --kubeconfig-cluster file:///home/sthings/.kube/k3s \
---encrypt-with-^Cps=true \
+--encrypt-with-sops=true \
 --age-public-key=env:AGE_PUB \
 export --path=/tmp/output.yaml \
 --progress plain -vv
+```
+
+```bash
+# DECRYPT SECRET FOR VERIFY
+dagger call -m github.com/stuttgart-things/dagger/sops@v0.77.0 decrypt \
+--age-key env:SOPS_AGE_KEY  \
+--encrypted-file /tmp/output.yaml \
+export --path=/tmp/secrets.dec.yaml
 ```
 
 </details>
