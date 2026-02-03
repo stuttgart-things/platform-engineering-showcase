@@ -1,6 +1,6 @@
 # VM
 
-## RENDER VM 
+## RENDER VM
 
 ```bash
 # CREATE CLOUD-CONFIG DATA

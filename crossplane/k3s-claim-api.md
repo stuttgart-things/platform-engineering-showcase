@@ -24,12 +24,12 @@ helmfile apply -f git::https://github.com/stuttgart-things/helm.git@cicd/flux-op
 
 <details open>
 <summary>RENDER FLUX CONFIG</summary>
-  
+
 ```bash
 dagger call -m github.com/stuttgart-things/dagger/kcl@v0.76.0 run \
 --oci-source ghcr.io/stuttgart-things/kcl-flux-instance:0.3.3 \
 --parameters " \
-name=flux, \                                          
+name=flux, \
 namespace=flux-system, \
 gitUrl=https://github.com/stuttgart-things/stuttgart-things.git, \
 gitRef=refs/heads/main, \
@@ -47,7 +47,7 @@ export -path ./flux-instance.yaml
 
 <details open>
 <summary>ADD CLUSTER TO CROSSPLANE (SOPS ENCRYPTED)</summary>
-  
+
 ```bash
 dagger call -m github.com/stuttgart-things/blueprints/crossplane-configuration add-cluster \
 --clusterName=in-cluster \
@@ -98,5 +98,3 @@ ghcr.io/stuttgart-things/claim-machinery-api:v0.3.0
 ```
 
 </details>
-
-

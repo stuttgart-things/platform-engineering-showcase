@@ -1,0 +1,184 @@
+---
+version: "3"
+tasks:
+  create-custom-vmconfig:
+    desc: Create new VM configuration
+    vars:
+      DAGGER_MODULE: /home/sthings/projects/blueprints/configuration #github.com/stuttgart-things/blueprints/configuration
+      DAGGER_MODULE_VERSION: v1.30.1
+      DAGGER_FUNCTION: vsphere-vm
+      VM_NAME:
+        sh: gum input --placeholder "VM Name"
+      VM_COUNT:
+        sh: gum choose --header "VM Count" "1" "2" "3" "4" "5"
+      VM_RAM:
+        sh: gum choose --header "VM RAM" "8192" "12288" "16384" "24576" "32768"
+      VM_TEMPLATE:
+        sh: gum choose --header "VM Template" "sthings-u24"
+      VM_CPU:
+        sh: gum choose --header "VM CPU" "6" "8" "12" "16"
+      VM_DISK:
+        sh: gum choose --header "VM Disk" "64" "96" "128" "256"
+      VM_FIRMWARE:
+        sh: gum choose --header "VM Firmware" "bios" "efi"
+      VM_FOLDER:
+        sh: gum input --placeholder "VM Folder" --value "stuttgart-things/testing"
+      VM_DATACENTER:
+        sh: gum choose --header "VM Datacenter" "/LabUL"
+      VM_DATASTORE:
+        sh: gum choose --header "VM Datastore" "/LabUL/datastore/ESX01-Local1" "/LabUL/datastore/ESX01-Local2" "/LabUL/datastore/UL-V5010-02-LUN2" "/LabUL/datastore/ESX02-Local2" "/LabUL/datastore/UL-V5010-01-LUN3" "/LabUL/datastore/ESX05-Local" "/LabUL/datastore/UL-V5010-02-LUN1" "/LabUL/datastore/DD1" "/LabUL/datastore/ESX02-Local1" "/LabUL/datastore/ESX03-Local" "/LabUL/datastore/UL-V5010-01-LUN1" "/LabUL/datastore/UL-V5010-02-LUN3" "/LabUL/datastore/ESX04-Local"
+      VM_RESOURCE_POOL:
+        sh: gum choose --header "VM Resource Pool" "/LabUL/host/Cluster-V6.7/Resources"
+      VM_NETWORK:
+        sh: gum choose --header "VM Network" "/LabUL/network/MGMT-10.31.101" "/LabUL/network/LAB-10.31.102" "/LabUL/network/LAB-10.31.103" "/LabUL/network/LAB-10.31.104"
+      USE_VAULT:
+        sh: gum choose --header "Use Vault?" "true" "false"
+      VAULT_SECRET_PATH:
+        sh: gum input --placeholder "Vault Secret Path" --value "vsphere-labul"
+      CREATE_BRANCH:
+        sh: gum choose --header "Create Branch?" "true" "false"
+      COMMIT_CONFIG:
+        sh: gum choose --header "Commit Config?" "true" "false"
+      CREATE_PR:
+        sh: gum choose --header "Create Pull Request?" "true" "false"
+      REPOSITORY:
+        sh: gum input --placeholder "Repository" --value "blueprints"
+      BASE_PATH:
+        sh: gum input --placeholder "Base Path" --value "terraform/vms"
+      DESTINATION_FOLDER:
+        sh: gum input --placeholder "Destination Folder" --value "{{ .VM_NAME }}"
+      GROUP: "stuttgart-things"
+    cmds:
+      - |
+        dagger call -m {{ .DAGGER_MODULE }} {{ .DAGGER_FUNCTION }} \
+          --src ./ \
+          --config-parameters "
+            name={{ .VM_NAME }},
+            count={{ .VM_COUNT }},
+            ram={{ .VM_RAM }},
+            template={{ .VM_TEMPLATE }},
+            disk={{ .VM_DISK }},
+            cpu={{ .VM_CPU }},
+            firmware={{ .VM_FIRMWARE }},
+            vm_folder={{ .VM_FOLDER }},
+            datacenter={{ .VM_DATACENTER }},
+            datastore={{ .VM_DATASTORE }},
+            resourcePool={{ .VM_RESOURCE_POOL }},
+            network={{ .VM_NETWORK }},
+            useVault={{ .USE_VAULT }},
+            vaultSecretPath={{ .VAULT_SECRET_PATH }}
+            " \
+          --token=env:GITHUB_TOKEN \
+          --create-branch={{ .CREATE_BRANCH }} \
+          --commit-config={{ .COMMIT_CONFIG }} \
+          --create-pull-request={{ .CREATE_PR }} \
+          --repository "{{ .GROUP }}/{{ .REPOSITORY }}" \
+          --destination-folder "{{ .DESTINATION_FOLDER }}" \
+          --destination-base-path "{{ .BASE_PATH }}" \
+          -vv --progress plain \
+          export --path=/tmp/{{ .VM_NAME }}
+
+  check-vsphere-resources:
+    desc: Check vSphere resources (datastores or networks)
+    vars:
+      DAGGER_MODULE: github.com/stuttgart-things/dagger/packer
+      DAGGER_MODULE_VERSION: v0.49.2
+      RESOURCE_TYPE:
+        sh: gum choose --header "Resource Type" "check-datastores" "check-networks"
+      VCENTER_FQDN:
+        sh: gum input --placeholder "vCenter FQDN" --value "${VCENTER_FQDN}"
+      VCENTER_USER:
+        sh: gum input --placeholder "vCenter Username" --value "${VCENTER_USER}"
+      VCENTER_PASSWORD:
+        sh: gum input --placeholder "vCenter Password" --password --value "${VCENTER_PASSWORD}"
+      DATACENTER:
+        sh: gum input --placeholder "Datacenter" --value "${DATACENTER:-LabUL}"
+      OUTPUT_PATH:
+        sh: gum input --placeholder "Output Path" --value "/tmp/vsphere-{{ .RESOURCE_TYPE }}.txt"
+    cmds:
+      - |
+        dagger call -m {{ .DAGGER_MODULE }}@{{ .DAGGER_MODULE_VERSION }} {{ .RESOURCE_TYPE }} \
+          --vcenter env:VCENTER_FQDN \
+          --username env:VCENTER_USER \
+          --password env:VCENTER_PASSWORD \
+          --datacenter="{{ .DATACENTER }}" \
+          --progress plain -vv \
+          export --path={{ .OUTPUT_PATH }}
+    env:
+      VCENTER_FQDN: "{{ .VCENTER_FQDN }}"
+      VCENTER_USER: "{{ .VCENTER_USER }}"
+      VCENTER_PASSWORD: "{{ .VCENTER_PASSWORD }}"
+
+  create-ansible-requirements:
+    desc: Create Ansible requirement files from templates
+    vars:
+      DAGGER_MODULE: github.com/stuttgart-things/blueprints/configuration
+      DAGGER_MODULE_VERSION: v1.29.0
+      DAGGER_FUNCTION: create-ansible-requirement-files
+      TEMPLATE_PATHS: https://raw.githubusercontent.com/stuttgart-things/ansible/refs/heads/main/templates/requirements.yaml.tmpl
+      DATA_FILE: https://raw.githubusercontent.com/stuttgart-things/ansible/refs/heads/main/templates/requirements-data.yaml
+      OUTPUT_PATH:
+        sh: gum input --placeholder "Output Path" --value "/tmp/ansible-output"
+    cmds:
+      - |
+        dagger call -m {{ .DAGGER_MODULE }}@{{ .DAGGER_MODULE_VERSION }} {{ .DAGGER_FUNCTION }} \
+          --template-paths {{ .TEMPLATE_PATHS }} \
+          --data-file {{ .DATA_FILE }} \
+          export --path {{ .OUTPUT_PATH }} \
+          -vv --progress plain
+
+  render-vm-readme:
+    desc: Render VM README from template
+    vars:
+      DAGGER_MODULE: github.com/stuttgart-things/blueprints/configuration
+      DAGGER_MODULE_VERSION: v1.29.0
+      DAGGER_FUNCTION: render-metadata
+      SRC_PATH:
+        sh: gum input --placeholder "Source Path" --value "/home/sthings/projects/blueprints/tests/configuration/"
+      TEMPLATE_PATH:
+        sh: gum input --placeholder "Template Path" --value "README.md.tmpl"
+      DATA_FILES:
+        sh: gum input --placeholder "Data Files (comma-separated)" --value "vm-ansible.yaml,other-vars.yaml"
+      CONFIG_PARAMETERS:
+        sh: gum input --placeholder "Config Parameters key=value," --value ""
+      OUTPUT_PATH:
+        sh: gum input --placeholder "Output Path" --value "/tmp/readme/"
+    cmds:
+      - |
+        dagger call -m {{ .DAGGER_MODULE }}@{{ .DAGGER_MODULE_VERSION }} {{ .DAGGER_FUNCTION }} \
+          --src {{ .SRC_PATH }} \
+          --template-path {{ .TEMPLATE_PATH }} \
+          --data-files {{ .DATA_FILES }} \
+          --config-parameters="{{ .CONFIG_PARAMETERS }}" \
+          export --path {{ .OUTPUT_PATH }} \
+          -vv --progress plain
+
+  render-vm-executionfile:
+    desc: Render VM Executionfile from template
+    vars:
+      DAGGER_MODULE: github.com/stuttgart-things/blueprints/configuration
+      DAGGER_MODULE_VERSION: v1.29.0
+      DAGGER_FUNCTION: render-metadata
+      SRC_PATH:
+        sh: gum input --placeholder "Source Path" --value "/home/sthings/projects/blueprints/tests/vm/"
+      TEMPLATE_PATH:
+        sh: gum input --placeholder "Template Path" --value "execution.yaml.tmpl"
+      DATA_FILES:
+        sh: gum input --placeholder "Data Files (comma-separated)" --value "execution-vars.yaml"
+      CONFIG_PARAMETERS:
+        sh: gum input --placeholder "Config Parameters key=value," --value ""
+      OUTPUT_PATH:
+        sh: gum input --placeholder "Output Path" --value "/tmp/readme/"
+    cmds:
+      - |
+        dagger call -m {{ .DAGGER_MODULE }}@{{ .DAGGER_MODULE_VERSION }} {{ .DAGGER_FUNCTION }} \
+          --src {{ .SRC_PATH }} \
+          --template-path {{ .TEMPLATE_PATH }} \
+          --data-files {{ .DATA_FILES }} \
+          --config-parameters="{{ .CONFIG_PARAMETERS }}" \
+          export --path {{ .OUTPUT_PATH }} \
+          -vv --progress plain
+
+
+
+#dagger call -m github.com/stuttgart-things/blueprints/vm@v1.29.0 bake-local-by-profile --src ./ --profile execution.yaml --vault-secret-id env:VAULT_SECRET_ID --vault-role-id env:VAULT_ROLE_ID --ansible-user env:ANSIBLE_USER --ansible-password env:ANSIBLE_PASSWORD --progress plain -vv export --path ./
