@@ -23,6 +23,30 @@ fi
 
 IMAGE_SIZE=$(stat -c%s "${IMAGE_FILE}")
 
+# Delete existing image if it exists so we can overwrite
+echo "Checking for existing VirtualMachineImage ${IMAGE_NAME} in namespace ${NAMESPACE}..."
+HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}")
+
+if [ "${HTTP_CODE}" = "200" ]; then
+  echo "Existing image found, deleting..."
+  curl -sk -X DELETE \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}" &> /dev/null
+  echo "Waiting for image deletion to complete..."
+  for i in $(seq 1 30); do
+    HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
+      -H "Authorization: Bearer ${TOKEN}" \
+      "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}")
+    if [ "${HTTP_CODE}" = "404" ]; then
+      echo "Image deleted."
+      break
+    fi
+    sleep 5
+  done
+fi
+
 echo "Creating VirtualMachineImage ${IMAGE_NAME} in namespace ${NAMESPACE}..."
 yq -j '.metadata.name = "'"${IMAGE_NAME}"'" | .spec.displayName = "'"${IMAGE_NAME}"'"' vmi_template.yaml | \
   curl -sk -X POST \
