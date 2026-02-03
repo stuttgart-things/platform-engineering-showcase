@@ -32,3 +32,22 @@ variable "users_file" {
   type    = string
   default = "users.yaml"
 }
+
+variable "harvester_vip" {
+  type        = string
+  default     = ""
+  description = "Harvester VIP address (passed via GH workflow)"
+}
+
+variable "harvester_password" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Harvester admin password (passed via GH workflow)"
+}
+
+variable "upload_to_harvester" {
+  type        = string
+  default     = "false"
+  description = "Set to 'true' to upload the image to Harvester after build"
+}

@@ -55,4 +55,17 @@ build {
           "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do echo 'Waiting for Cloud-Init...'; tail -n10 /var/log/cloud-init-output.log; sleep 5; done"
       ]
   }
+
+  post-processor "shell-local" {
+    execute_command = ["bash", "-c", "{{.Vars}} {{.Script}}"]
+    script          = "upload.sh"
+    environment_vars = [
+      "UPLOAD_TO_HARVESTER=${var.upload_to_harvester}",
+      "HARVESTER_VIP=${var.harvester_vip}",
+      "HARVESTER_PASSWORD=${var.harvester_password}",
+      "IMAGE_NAME=${var.image_name}",
+      "IMAGE_FILE=${var.output_location}/${var.image_name}-amd64.img",
+      "NAMESPACE=${var.namespace}"
+    ]
+  }
 }

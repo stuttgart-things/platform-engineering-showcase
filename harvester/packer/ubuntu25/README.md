@@ -8,16 +8,19 @@ Builds a Ubuntu 22.04 (Jammy) QEMU disk image with custom packages and users con
 - QEMU with KVM support
 - `genisoimage` (for cloud-init ISO generation)
 - OVMF firmware (`/usr/share/OVMF/OVMF_CODE_4M.fd`, `/usr/share/OVMF/OVMF_VARS_4M.fd`)
+- `jq`, `yq`, `curl` (for Harvester upload)
 
 ## File Structure
 
 ```
 .
-├── spec.pkr.hcl              # QEMU source and build definition
+├── spec.pkr.hcl              # QEMU source and build definition (incl. upload post-processor)
 ├── spec.cloud-init.pkr.hcl   # Cloud-init user-data/meta-data generation
 ├── variables.pkr.hcl         # Variable definitions and defaults
 ├── packages.yaml             # Packages to install in the image
 ├── users.yaml                # Users and SSH keys to provision
+├── upload.sh                 # Harvester image upload script
+├── vmi_template.yaml         # Harvester VirtualMachineImage CRD template
 └── README.md
 ```
 
@@ -78,7 +81,18 @@ packer init .
 packer build .
 ```
 
-The output image (`ubuntu-jammy-base-amd64.img`) will be placed in the `output/` directory.
+The output image (`ubuntu-jammy-base-amd64.img`) will be placed in the `output/` directory. The Harvester upload is skipped by default.
+
+### Build and upload to Harvester
+
+```bash
+packer build \
+  -var 'upload_to_harvester=true' \
+  -var 'harvester_vip=10.31.101.8' \
+  -var 'harvester_password=yourpassword' .
+```
+
+The post-processor authenticates against the Harvester API, creates a `VirtualMachineImage` resource, and uploads the built image.
 
 ### Override variables
 
@@ -111,6 +125,9 @@ packer build -var 'ubuntu_url=https://cloud-images.ubuntu.com/noble/current/nobl
 | `output_location` | `output/`                                | Directory for build output           |
 | `packages_file`   | `packages.yaml`                          | Path to packages YAML                |
 | `users_file`      | `users.yaml`                             | Path to users YAML                   |
+| `upload_to_harvester` | `false`                              | Set to `true` to upload to Harvester |
+| `harvester_vip`   | (empty)                                  | Harvester VIP address                |
+| `harvester_password` | (empty, sensitive)                    | Harvester admin password             |
 
 ## GitHub Actions
 
@@ -125,6 +142,15 @@ Inputs:
 - **template**: Packer template target (default: `.`)
 - **var_file**: Optional `.pkrvars.hcl` file for overrides
 - **log_level**: Packer log verbosity (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`)
+
+To enable the Harvester upload from the workflow, pass `harvester_vip` and `harvester_password` as variables (e.g. from repository secrets) and set `upload_to_harvester=true`:
+
+```bash
+packer build \
+  -var 'upload_to_harvester=true' \
+  -var "harvester_vip=${{ secrets.HARVESTER_VIP }}" \
+  -var "harvester_password=${{ secrets.HARVESTER_PASSWORD }}" .
+```
 
 ## Backstage Integration
 
