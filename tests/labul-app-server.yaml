@@ -1,0 +1,34 @@
+apiVersion: resources.stuttgart-things.com/v1alpha1
+kind: VsphereVM
+metadata:
+  annotations:
+    crossplane.io/managed-by: kcl
+  name: app-server
+  namespace: default
+spec:
+  vm:
+    count: '1'
+    name: app-server
+    ram: '2048'
+    disk: '32'
+    cpu: '2'
+    firmware: bios
+    folderPath: /LabUL/vm/intc
+    datacenter: /LabUL/
+    datastore: /LabUL/datastore/UL-ESX-SAS-01
+    resourcePool: /LabUL/host/Cluster-V6.7/Resources
+    network: /LabUL/network/MGMT-10.31.101
+    template: sthings-u24
+    bootstrap: '["echo STUTTGART-THINGS"]'
+    annotation: VSPHERE-VM BUILD w/ CROSSPLANE FOR STUTTGART-THINGS
+    unverifiedSsl: 'true'
+  tfvars:
+    secretName: vsphere-tfvars-labul
+    secretNamespace: crossplane-system
+    secretKey: terraform.tfvars
+  connectionSecret:
+    name: app-server-connection
+    namespace: default
+  providerRef:
+    name: default
+    kind: ClusterProviderConfig
