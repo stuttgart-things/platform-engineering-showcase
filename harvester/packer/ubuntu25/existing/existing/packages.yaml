@@ -6,6 +6,3 @@ packages:
   - git
   - jq
   - git
-  - git
-  - apache
-  - zsh
