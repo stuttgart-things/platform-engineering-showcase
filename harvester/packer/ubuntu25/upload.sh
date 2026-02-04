@@ -1,6 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+# Set defaults or check for required variables
+IMAGE_FILE="${IMAGE_FILE:-}" # required
+IMAGE_NAME="${IMAGE_NAME:-}" # required
+NAMESPACE="${NAMESPACE:-default}"
+
+if [ -z "$IMAGE_FILE" ]; then
+  echo "ERROR: IMAGE_FILE is not set."
+  exit 1
+fi
+if [ -z "$IMAGE_NAME" ]; then
+  echo "ERROR: IMAGE_NAME is not set."
+  exit 1
+fi
+
 if [ "${UPLOAD_TO_HARVESTER}" != "true" ]; then
   echo "Skipping Harvester upload (UPLOAD_TO_HARVESTER != true)"
   exit 0
@@ -35,7 +49,7 @@ if [ "${HTTP_CODE}" = "200" ]; then
     -H "Authorization: Bearer ${TOKEN}" \
     "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}" &> /dev/null
   echo "Waiting for image deletion to complete..."
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
       -H "Authorization: Bearer ${TOKEN}" \
       "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}")
