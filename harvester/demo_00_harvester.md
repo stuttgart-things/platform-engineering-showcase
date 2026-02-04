@@ -1,5 +1,4 @@
-# HARVESTER
-
+# HARVESTER DEMO
 
 <details>
   <summary>VM DEFINITION</summary>
