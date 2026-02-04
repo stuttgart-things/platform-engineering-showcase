@@ -1,3 +1,16 @@
+# What is Harvester?
+
+Harvester is an open-source, cloud-native hyperconverged infrastructure (HCI) platform built on Kubernetes. It lets you run and manage virtual machines (VMs) and containers together on the same infrastructure, using modern cloud-native tools and APIs.
+
+## Why use Harvester?
+
+- **Unified platform:** Manage VMs and containers side by side, leveraging Kubernetes for orchestration.
+- **Open-source:** No vendor lock-in, fully community-driven.
+- **Cloud-native:** Integrates with Kubernetes, making it easy to automate, scale, and connect with other cloud-native tools.
+- **Simplicity:** Provides a user-friendly UI and API for VM lifecycle management.
+- **Cost-effective:** Run on commodity hardware, ideal for edge, lab, or private cloud environments.
+
+Harvester is a great choice if you want to modernize your virtualization stack, bridge the gap between VMs and containers, or build a flexible, open infrastructure platform.
 # HARVESTER DEMO
 
 <details>
