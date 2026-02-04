@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Assign IMAGE_FILE if not already set
+: "${IMAGE_FILE:=${output_location:-output}/${IMAGE_NAME}-amd64.img}"
+
 if [ "${UPLOAD_TO_HARVESTER}" != "true" ]; then
   echo "Skipping Harvester upload (UPLOAD_TO_HARVESTER != true)"
   exit 0
@@ -35,7 +38,7 @@ if [ "${HTTP_CODE}" = "200" ]; then
     -H "Authorization: Bearer ${TOKEN}" \
     "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}" &> /dev/null
   echo "Waiting for image deletion to complete..."
-  for i in $(seq 1 30); do
+  seq 1 30 | while read -r _; do
     HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
       -H "Authorization: Bearer ${TOKEN}" \
       "https://${HARVESTER_VIP}/v1/harvester/harvesterhci.io.virtualmachineimages/${NAMESPACE}/${IMAGE_NAME}")
