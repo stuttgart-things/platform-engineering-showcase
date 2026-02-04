@@ -1,13 +1,8 @@
----
 packages:
   - qemu-guest-agent
   - vim
   - curl
   - git
   - jq
-  - git
-  - git
-  - apache
-  - zsh
   - apache
   - zsh
