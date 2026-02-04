@@ -9,3 +9,5 @@ packages:
   - git
   - apache
   - zsh
+  - apache
+  - zsh
