@@ -192,6 +192,176 @@ tasks:
       CILIUM_CRDS_KUSTOMIZE: https://github.com/stuttgart-things/helm/infra/crds/cilium
       CILIUM_HELMFILE_REF: "git::https://github.com/stuttgart-things/helm.git@infra/cilium.yaml.gotmpl"
 
+  deploy-platform:
+    desc: Deploy the platform bundle (cilium/openebs/tekton/crossplane) via the central helmfile
+    vars:
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
+      BUNDLE_DIR: bundles
+      BUNDLE_FILE: platform.yaml.gotmpl
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        # SELECT COMPONENTS (pre-selected = bundle defaults)
+        SELECTED=$(gum choose --no-limit --header "Components to deploy" \
+          --selected="openebs,tekton,crossplane" \
+          "openebs" "tekton" "crossplane" "cilium")
+        [ -z "$SELECTED" ] && { echo "Nothing selected."; exit 0; }
+        on() { echo "$SELECTED" | grep -qx "$1" && echo true || echo false; }
+        STATE="openebsEnabled=$(on openebs),tektonEnabled=$(on tekton),crossplaneEnabled=$(on crossplane),ciliumEnabled=$(on cilium)"
+        echo "Components: ${SELECTED//$'\n'/ }  ->  ${STATE}"
+
+        gum confirm "Deploy platform bundle to ${KUBECONFIG}?" || exit 0
+
+        # APPLY THE BUNDLE — composes the helm-repo helmfiles (remote) into one apply.
+        dagger call -m {{ .HELM_DAGGER_MODULE }} \
+          helmfile-operation \
+          --operation apply \
+          --src {{ .BUNDLE_DIR }} \
+          --helmfile-ref {{ .BUNDLE_FILE }} \
+          --state-values "${STATE}" \
+          --kube-config file://${KUBECONFIG} \
+          --progress plain -vv
+
+        # FINALIZE CROSSPLANE — the bundle intentionally omits provider-configs
+        # (their CRDs only exist once the providers/config are Healthy). Apply
+        # them here, after waiting, if crossplane was part of this run.
+        if echo "$SELECTED" | grep -qx crossplane; then
+          echo "▶ Finalizing Crossplane provider-configs..."
+          kubectl -n crossplane-system rollout status deploy/crossplane --timeout=180s
+          kubectl wait provider.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+          kubectl wait configuration.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+          echo "Waiting for kubernetes.m.crossplane.io CRD (transitive provider-kubernetes)..."
+          for i in $(seq 1 60); do
+            kubectl get crd clusterproviderconfigs.kubernetes.m.crossplane.io >/dev/null 2>&1 && break
+            sleep 5
+          done
+          kubectl wait provider.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+          kubectl wait function.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+          dagger call -m {{ .HELM_DAGGER_MODULE }} \
+            helmfile-operation \
+            --operation apply \
+            --helmfile-ref "{{ .HELM_GIT_REPO }}@cicd/crossplane-provider-configs.yaml.gotmpl" \
+            --kube-config file://${KUBECONFIG} \
+            --progress plain -vv
+        fi
+
+        echo "✅ PLATFORM DEPLOYED"
+        kubectl get nodes
+
+  deploy-crossplane:
+    desc: Deploy Crossplane (core, providers, functions/configs, provider-configs) via dagger helmfile-operation
+    vars:
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        gum confirm "Deploy Crossplane to ${KUBECONFIG}?" || exit 0
+
+        apply() {
+          echo "▶ APPLYING: $1"
+          dagger call -m {{ .HELM_DAGGER_MODULE }} \
+            helmfile-operation \
+            --operation apply \
+            --helmfile-ref "{{ .HELM_GIT_REPO }}@$1" \
+            --kube-config file://${KUBECONFIG} \
+            --progress plain -vv
+        }
+
+        # 1) CORE — installs Crossplane + package CRDs
+        apply cicd/crossplane.yaml.gotmpl
+        kubectl -n crossplane-system rollout status deploy/crossplane --timeout=180s
+
+        # 2) PROVIDERS — Provider CRs + RBAC only (ProviderConfigs are a
+        #    separate helmfile, applied in step 4 once the CRDs exist).
+        apply cicd/crossplane-providers.yaml.gotmpl
+        kubectl wait provider.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+
+        # 3) FUNCTIONS + CONFIGURATIONS — Configurations pull provider-kubernetes
+        #    transitively via dependsOn, which creates the kubernetes.m.crossplane.io CRD.
+        apply cicd/crossplane-config.yaml.gotmpl
+        kubectl wait configuration.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+
+        # wait for the transitive provider-kubernetes CRD before applying provider-configs
+        echo "Waiting for kubernetes.m.crossplane.io CRD (transitive provider-kubernetes)..."
+        for i in $(seq 1 60); do
+          kubectl get crd clusterproviderconfigs.kubernetes.m.crossplane.io >/dev/null 2>&1 && break
+          sleep 5
+        done
+        kubectl wait provider.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+        kubectl wait function.pkg.crossplane.io --all --for=condition=Healthy --timeout=300s
+
+        # 4) PROVIDER-CONFIGS — separate helmfile; all ProviderConfig CRDs now exist
+        apply cicd/crossplane-provider-configs.yaml.gotmpl
+
+        echo "✅ CROSSPLANE DEPLOYED"
+        kubectl get provider.pkg.crossplane.io,function.pkg.crossplane.io,configuration.pkg.crossplane.io
+
+  deploy-tekton:
+    desc: Deploy Tekton (operator + pipeline component) via dagger helmfile-operation
+    vars:
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        gum confirm "Deploy Tekton to ${KUBECONFIG}?" || exit 0
+
+        # APPLY — installs the Tekton Operator; with autoInstallComponents=false
+        # + enableTektonPipeline=true the chart renders a TektonPipeline CR
+        # (Pipelines only, no Dashboard/Triggers/Chains).
+        echo "▶ APPLYING: cicd/tekton.yaml.gotmpl"
+        dagger call -m {{ .HELM_DAGGER_MODULE }} \
+          helmfile-operation \
+          --operation apply \
+          --helmfile-ref "{{ .HELM_GIT_REPO }}@cicd/tekton.yaml.gotmpl" \
+          --kube-config file://${KUBECONFIG} \
+          --progress plain -vv
+
+        # WAIT for operator + the pipeline component to be ready
+        kubectl -n tekton-operator rollout status deploy/tekton-operator --timeout=180s
+        echo "Waiting for TektonPipeline CR to be created by the operator..."
+        for i in $(seq 1 60); do
+          kubectl get tektonpipeline pipeline >/dev/null 2>&1 && break
+          sleep 5
+        done
+        kubectl wait tektonpipeline --all --for=condition=Ready --timeout=300s
+
+        echo "✅ TEKTON DEPLOYED"
+        kubectl get tektonpipeline
+        kubectl -n tekton-pipelines get pods
+
   do:
     desc: Select a task to run
     cmds:
