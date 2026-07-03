@@ -1,0 +1,52 @@
+---
+# Central platform bundle — composes the stuttgart-things/helm helmfiles into
+# one callable state. Toggle components via *Enabled state values; pin the
+# source ref with `ref` (default: main).
+#
+#   helmfile -f bundles/platform.yaml.gotmpl apply
+#   # selective:
+#   helmfile -f bundles/platform.yaml.gotmpl --state-values-set tektonEnabled=false apply
+#
+# Sub-helmfiles are fetched from the helm repo (git). Crossplane's
+# provider-configs are intentionally NOT part of this bundle: they reference
+# ProviderConfig CRDs that only register once the providers are Healthy, so a
+# flat apply can't satisfy them. Apply cicd/crossplane-provider-configs.yaml.gotmpl
+# afterwards (the deploy-platform / deploy-crossplane task does this with waits).
+environments:
+  default:
+    values:
+      - ciliumEnabled: {{ dig "ciliumEnabled" false .Values }}
+      - openebsEnabled: {{ dig "openebsEnabled" true .Values }}
+      - crossplaneEnabled: {{ dig "crossplaneEnabled" true .Values }}
+      - tektonEnabled: {{ dig "tektonEnabled" true .Values }}
+      # source ref of the stuttgart-things/helm repo
+      - ref: {{ dig "ref" "main" .Values }}
+      # cilium state values (only consumed when ciliumEnabled)
+      - config: {{ dig "config" "kind" .Values }}
+      - clusterName: {{ dig "clusterName" "kind" .Values }}
+      - configureLB: {{ dig "configureLB" false .Values }}
+---
+helmfiles:
+{{- if .Values.ciliumEnabled }}
+  # CNI first — nodes stay NotReady until a CNI is installed.
+  - path: git::https://github.com/stuttgart-things/helm.git@infra/cilium.yaml.gotmpl?ref={{ .Values.ref }}
+    values:
+      - config: {{ .Values.config }}
+      - clusterName: {{ .Values.clusterName }}
+      - configureLB: {{ .Values.configureLB }}
+{{- end }}
+{{- if .Values.openebsEnabled }}
+  # Storage (openebs-hostpath / localpv).
+  - path: git::https://github.com/stuttgart-things/helm.git@infra/openebs.yaml.gotmpl?ref={{ .Values.ref }}
+{{- end }}
+{{- if .Values.tektonEnabled }}
+  # Tekton operator + pipeline component (Pipelines only).
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/tekton.yaml.gotmpl?ref={{ .Values.ref }}
+{{- end }}
+{{- if .Values.crossplaneEnabled }}
+  # Crossplane core + providers (+RBAC) + functions/configurations.
+  # provider-configs are applied separately (see header note).
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/crossplane.yaml.gotmpl?ref={{ .Values.ref }}
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/crossplane-config.yaml.gotmpl?ref={{ .Values.ref }}
+  - path: git::https://github.com/stuttgart-things/helm.git@cicd/crossplane-providers.yaml.gotmpl?ref={{ .Values.ref }}
+{{- end }}
