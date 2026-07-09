@@ -367,15 +367,18 @@ tasks:
     vars:
       CHARTS_OCI: oci://ghcr.io/stuttgart-things/charts
       KUBECONFIG_PATH: ~/.kube
+      # age-encrypted creds blobs for the sops backend (variant B, supplied at deploy).
+      SECRETS_DIR: '{{ .SECRETS_DIR | default "~/projects/stuttgart-things/secrets" }}'
       # Pinned chart versions (bump on release).
-      VSPHEREVM_VER: "0.7.0"
-      ANSIBLE_VER: "0.2.0"
-      PROXMOXVM_VER: "0.2.0"
+      VSPHEREVM_VER: "0.8.0"
+      ANSIBLE_VER: "0.3.0"
+      PROXMOXVM_VER: "0.3.0"
       ALL_KUBECONFIGS:
         sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
     cmds:
       - |
         set -e
+        SECRETS_DIR=$(eval echo {{ .SECRETS_DIR }})
 
         # SELECT KUBECONFIG
         SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
@@ -389,26 +392,41 @@ tasks:
           --selected="vspherevm,ansible" vspherevm ansible proxmoxvm)
         [ -z "$CAPS" ] && { echo "Nothing selected."; exit 0; }
 
-        # Dev clusters (kind) have no ESO/Vault, and for vsphere/proxmox the
-        # XRD+Composition are applied by hand -> skip ESO secret creation + the
-        # Configuration package install (out-of-band creds + manual XRD/Composition).
-        if gum confirm "Dev cluster? (skip ESO secret creation + Configuration package install)"; then DEV=1; else DEV=0; fi
+        # Creds-Secret backend: none (out-of-band) | eso (Vault) | sops (age-encrypted
+        # blob from $SECRETS_DIR, materialized by sops-secrets-operator).
+        BACKEND=$(printf 'sops\nnone\neso\n' | gum choose --header "Creds backend for this cluster")
 
-        gum confirm "Deploy [${CAPS//$'\n'/ }] for env=$ENV to ${KUBECONFIG}?" || exit 0
+        # Configuration package install: skip on dev clusters where the XRD+Composition
+        # are already applied by hand (vsphere/proxmox only; ansible has no package).
+        if gum confirm "Install the Configuration OCI package? (No = XRD/Composition already present, e.g. kind)"; then INSTALL_CFG=true; else INSTALL_CFG=false; fi
 
-        ver()     { case "$1" in vspherevm) echo {{ .VSPHEREVM_VER }};; ansible) echo {{ .ANSIBLE_VER }};; proxmoxvm) echo {{ .PROXMOXVM_VER }};; esac; }
-        toggles() {
-          [ "$DEV" = "1" ] || { echo ""; return; }
+        gum confirm "Deploy [${CAPS//$'\n'/ }] env=$ENV backend=$BACKEND to ${KUBECONFIG}?" || exit 0
+
+        ver() { case "$1" in vspherevm) echo {{ .VSPHEREVM_VER }};; ansible) echo {{ .ANSIBLE_VER }};; proxmoxvm) echo {{ .PROXMOXVM_VER }};; esac; }
+        # creds Secret name prefix per capability (for the sops blob filename).
+        credfile() {
           case "$1" in
-            ansible)   echo "--set sshCredentials.create=false";;  # ansible: only an ExternalSecret, no Configuration
-            *)         echo "--set secretStore.create=false --set configuration.install=false";;
+            vspherevm) echo "$SECRETS_DIR/vsphere-creds-$ENV.enc.yaml";;
+            proxmoxvm) echo "$SECRETS_DIR/proxmox-creds-$ENV.enc.yaml";;
+            ansible)   echo "$SECRETS_DIR/ansible-credentials.enc.yaml";;
           esac
+        }
+        flags() {
+          local cap="$1" out=""
+          if [ "$cap" = "ansible" ]; then
+            out="--set sshCredentials.backend=$BACKEND"
+            [ "$BACKEND" = "sops" ] && out="$out --set-file sshCredentials.sops.encryptedCredentials=$(credfile "$cap")"
+          else
+            out="--set secretStore.backend=$BACKEND --set configuration.install=$INSTALL_CFG"
+            [ "$BACKEND" = "sops" ] && out="$out --set-file secretStore.sops.encryptedCredentials=$(credfile "$cap")"
+          fi
+          echo "$out"
         }
 
         for cap in $CAPS; do
-          echo "▶ $cap ($ENV) v$(ver "$cap")"
+          echo "▶ $cap ($ENV) v$(ver "$cap") backend=$BACKEND"
           helm upgrade --install "$cap-$ENV" {{ .CHARTS_OCI }}/"$cap" --version "$(ver "$cap")" \
-            --set environment="$ENV" $(toggles "$cap") \
+            --set environment="$ENV" $(flags "$cap") \
             -n crossplane-system --create-namespace
         done
 
