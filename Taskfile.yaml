@@ -362,6 +362,60 @@ tasks:
         kubectl get tektonpipeline
         kubectl -n tekton-pipelines get pods
 
+  deploy-capabilities:
+    desc: Deploy vspherevm/ansible/proxmoxvm platform capabilities from OCI charts (env-map) to a cluster
+    vars:
+      CHARTS_OCI: oci://ghcr.io/stuttgart-things/charts
+      KUBECONFIG_PATH: ~/.kube
+      # Pinned chart versions (bump on release).
+      VSPHEREVM_VER: "0.7.0"
+      ANSIBLE_VER: "0.2.0"
+      PROXMOXVM_VER: "0.2.0"
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        # SELECT ENV (chart env-map key) + CAPABILITIES
+        ENV=$(printf 'labda\nlabul\n' | gum choose --header "Environment (chart env-map)")
+        CAPS=$(gum choose --no-limit --header "Capabilities to deploy" \
+          --selected="vspherevm,ansible" vspherevm ansible proxmoxvm)
+        [ -z "$CAPS" ] && { echo "Nothing selected."; exit 0; }
+
+        # Dev clusters (kind) have no ESO/Vault, and for vsphere/proxmox the
+        # XRD+Composition are applied by hand -> skip ESO secret creation + the
+        # Configuration package install (out-of-band creds + manual XRD/Composition).
+        if gum confirm "Dev cluster? (skip ESO secret creation + Configuration package install)"; then DEV=1; else DEV=0; fi
+
+        gum confirm "Deploy [${CAPS//$'\n'/ }] for env=$ENV to ${KUBECONFIG}?" || exit 0
+
+        ver()     { case "$1" in vspherevm) echo {{ .VSPHEREVM_VER }};; ansible) echo {{ .ANSIBLE_VER }};; proxmoxvm) echo {{ .PROXMOXVM_VER }};; esac; }
+        toggles() {
+          [ "$DEV" = "1" ] || { echo ""; return; }
+          case "$1" in
+            ansible)   echo "--set sshCredentials.create=false";;  # ansible: only an ExternalSecret, no Configuration
+            *)         echo "--set secretStore.create=false --set configuration.install=false";;
+          esac
+        }
+
+        for cap in $CAPS; do
+          echo "▶ $cap ($ENV) v$(ver "$cap")"
+          helm upgrade --install "$cap-$ENV" {{ .CHARTS_OCI }}/"$cap" --version "$(ver "$cap")" \
+            --set environment="$ENV" $(toggles "$cap") \
+            -n crossplane-system --create-namespace
+        done
+
+        echo "✅ CAPABILITIES DEPLOYED"
+        helm list -n crossplane-system | grep -E 'vspherevm|ansible|proxmoxvm' || true
+        kubectl get environmentconfig 2>/dev/null || true
+
   do:
     desc: Select a task to run
     cmds:
