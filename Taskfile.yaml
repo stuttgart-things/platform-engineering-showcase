@@ -533,7 +533,7 @@ tasks:
       # age-encrypted creds blobs for the sops backend (variant B, supplied at deploy).
       SECRETS_DIR: '{{ .SECRETS_DIR | default "~/projects/stuttgart-things/secrets" }}'
       # Pinned chart versions (bump on release).
-      VSPHEREVM_VER: "0.9.0"
+      VSPHEREVM_VER: "0.10.0"
       ANSIBLE_VER: "0.3.0"
       PROXMOXVM_VER: "0.3.0"
       ALL_KUBECONFIGS:
