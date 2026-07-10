@@ -463,7 +463,7 @@ tasks:
     vars:
       KUBECONFIG_PATH: ~/.kube
       # Configuration OCI packages (each pulls its provider via dependsOn).
-      VSPHEREVM_PKG: ghcr.io/stuttgart-things/crossplane-configurations/vspherevm:v0.6.0
+      VSPHEREVM_PKG: ghcr.io/stuttgart-things/crossplane-configurations/vspherevm:v0.7.0
       PROXMOXVM_PKG: ghcr.io/stuttgart-things/crossplane-configurations/proxmoxvm:v0.4.0
       ALL_KUBECONFIGS:
         sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
@@ -533,7 +533,7 @@ tasks:
       # age-encrypted creds blobs for the sops backend (variant B, supplied at deploy).
       SECRETS_DIR: '{{ .SECRETS_DIR | default "~/projects/stuttgart-things/secrets" }}'
       # Pinned chart versions (bump on release).
-      VSPHEREVM_VER: "0.8.0"
+      VSPHEREVM_VER: "0.9.0"
       ANSIBLE_VER: "0.3.0"
       PROXMOXVM_VER: "0.3.0"
       ALL_KUBECONFIGS:
