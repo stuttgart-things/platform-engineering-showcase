@@ -396,7 +396,7 @@ tasks:
         kubectl get provider.pkg.crossplane.io,function.pkg.crossplane.io,configuration.pkg.crossplane.io
 
   deploy-tekton:
-    desc: Deploy Tekton (operator + pipeline component) via dagger helmfile-operation
+    desc: 'CI storage + pipelines: OpenEBS (gum-confirmed) + Tekton operator/pipeline'
     vars:
       HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
@@ -413,20 +413,27 @@ tasks:
         echo "SWITCHING TO ${KUBECONFIG}"
         kubectl get nodes
 
+        # 1) OPENEBS — local-pv storage for Tekton PipelineRun workspaces. Optional:
+        #    skip if the cluster already has a StorageClass you want to use.
+        if gum confirm "Deploy OpenEBS (local-pv storage for pipelines)?"; then
+          echo "▶ APPLYING: infra/openebs.yaml.gotmpl"
+          dagger call -m {{ .HELM_DAGGER_MODULE }} helmfile-operation --operation apply \
+            --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/openebs.yaml.gotmpl" \
+            --kube-config file://${KUBECONFIG} --progress plain -vv
+          kubectl -n openebs rollout status deploy/openebs-localpv-provisioner --timeout=180s
+        else
+          echo "  ⏭  skipped OpenEBS"
+        fi
+
         gum confirm "Deploy Tekton to ${KUBECONFIG}?" || exit 0
 
-        # APPLY — installs the Tekton Operator; with autoInstallComponents=false
-        # + enableTektonPipeline=true the chart renders a TektonPipeline CR
-        # (Pipelines only, no Dashboard/Triggers/Chains).
+        # 2) TEKTON — operator; with autoInstallComponents=false + enableTektonPipeline=true
+        #    the chart renders a TektonPipeline CR (Pipelines only, no Dashboard/Triggers/Chains).
         echo "▶ APPLYING: cicd/tekton.yaml.gotmpl"
-        dagger call -m {{ .HELM_DAGGER_MODULE }} \
-          helmfile-operation \
-          --operation apply \
+        dagger call -m {{ .HELM_DAGGER_MODULE }} helmfile-operation --operation apply \
           --helmfile-ref "{{ .HELM_GIT_REPO }}@cicd/tekton.yaml.gotmpl" \
-          --kube-config file://${KUBECONFIG} \
-          --progress plain -vv
+          --kube-config file://${KUBECONFIG} --progress plain -vv
 
-        # WAIT for operator + the pipeline component to be ready
         kubectl -n tekton-operator rollout status deploy/tekton-operator --timeout=180s
         echo "Waiting for TektonPipeline CR to be created by the operator..."
         for i in $(seq 1 60); do
@@ -435,7 +442,7 @@ tasks:
         done
         kubectl wait tektonpipeline --all --for=condition=Ready --timeout=300s
 
-        echo "✅ TEKTON DEPLOYED"
+        echo "✅ TEKTON DEPLOYED (+ OpenEBS if selected)"
         kubectl get tektonpipeline
         kubectl -n tekton-pipelines get pods
 
@@ -564,14 +571,20 @@ tasks:
             ansible)   echo "$SECRETS_DIR/ansible-credentials.enc.yaml";;
           esac
         }
+        # Never fight a pre-existing Configuration: if the package is already installed
+        # (e.g. by deploy-configurations, via kubectl) the chart can't adopt it —
+        # `configuration.install=true` fails with "invalid ownership metadata". So force
+        # install=false whenever the Configuration/<cap> already exists, regardless of prompt.
+        cfg_installed() { kubectl get configuration.pkg.crossplane.io "$1" >/dev/null 2>&1; }
         flags() {
-          local cap="$1" env="$2" out=""
+          local cap="$1" env="$2" out="" inst="$INSTALL_CFG"
           if [ "$cap" = "ansible" ]; then
             out="--set sshCredentials.backend=$BACKEND"
-            [ "$BACKEND" = "sops" ] && out="$out --set-file sshCredentials.sops.encryptedCredentials=$(credfile "$cap" "$env")"
+            if [ "$BACKEND" = "sops" ]; then out="$out --set-file sshCredentials.sops.encryptedCredentials=$(credfile "$cap" "$env")"; fi
           else
-            out="--set secretStore.backend=$BACKEND --set configuration.install=$INSTALL_CFG"
-            [ "$BACKEND" = "sops" ] && out="$out --set-file secretStore.sops.encryptedCredentials=$(credfile "$cap" "$env")"
+            if cfg_installed "$cap"; then inst=false; fi
+            out="--set secretStore.backend=$BACKEND --set configuration.install=$inst"
+            if [ "$BACKEND" = "sops" ]; then out="$out --set-file secretStore.sops.encryptedCredentials=$(credfile "$cap" "$env")"; fi
           fi
           echo "$out"
         }
@@ -599,77 +612,11 @@ tasks:
         helm list -n crossplane-system | grep -E 'vspherevm|ansible|proxmoxvm' || true
         kubectl get environmentconfig 2>/dev/null || true
 
-  deploy-cert-manager:
-    desc: Deploy cert-manager (+ sthings config) via dagger helmfile-operation
+  deploy-sops-operator:
+    desc: 'Secrets layer: cert-manager (deployed only if missing) + sops-secrets-operator + age key'
     vars:
       HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
-      KUBECONFIG_PATH: ~/.kube
-      ALL_KUBECONFIGS:
-        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
-    cmds:
-      - |
-        set -e
-
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
-        kubectl get nodes
-
-        gum confirm "Deploy cert-manager to ${KUBECONFIG}?" || exit 0
-
-        echo "▶ APPLYING: infra/cert-manager.yaml.gotmpl"
-        dagger call -m {{ .HELM_DAGGER_MODULE }} \
-          helmfile-operation \
-          --operation apply \
-          --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/cert-manager.yaml.gotmpl" \
-          --kube-config file://${KUBECONFIG} \
-          --progress plain -vv
-
-        # WAIT — sops-secrets-operator's webhook cert depends on a ready cert-manager.
-        kubectl -n cert-manager rollout status deploy/cert-manager --timeout=180s
-        kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
-
-        echo "✅ CERT-MANAGER DEPLOYED"
-        kubectl -n cert-manager get pods
-
-  deploy-openebs:
-    desc: Deploy OpenEBS (local-pv storage) via dagger helmfile-operation
-    vars:
-      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
-      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
-      KUBECONFIG_PATH: ~/.kube
-      ALL_KUBECONFIGS:
-        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
-    cmds:
-      - |
-        set -e
-
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
-        kubectl get nodes
-
-        gum confirm "Deploy OpenEBS to ${KUBECONFIG}?" || exit 0
-
-        echo "▶ APPLYING: infra/openebs.yaml.gotmpl"
-        dagger call -m {{ .HELM_DAGGER_MODULE }} \
-          helmfile-operation \
-          --operation apply \
-          --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/openebs.yaml.gotmpl" \
-          --kube-config file://${KUBECONFIG} \
-          --progress plain -vv
-
-        kubectl -n openebs rollout status deploy/openebs-localpv-provisioner --timeout=180s
-
-        echo "✅ OPENEBS DEPLOYED"
-        kubectl -n openebs get pods
-
-  deploy-sops:
-    desc: Deploy sops-secrets-operator (kustomize) + install the age private key Secret (needs cert-manager + $SOPS_AGE_KEY)
-    vars:
       SOPS_OPERATOR_REF: v0.8.4
       SOPS_OPERATOR_KUSTOMIZE: https://github.com/stuttgart-things/sops-secrets-operator/config/default
       # Namespaces where consumer CRs (InlineSopsSecret) live — keyRef resolves in the CR's own namespace.
@@ -696,22 +643,29 @@ tasks:
         echo "SWITCHING TO ${KUBECONFIG}"
         kubectl get nodes
 
-        # cert-manager gate — the operator's conversion webhook needs it (see repo README).
-        if ! kubectl get deploy -n cert-manager cert-manager >/dev/null 2>&1; then
-          echo "⚠️  cert-manager not found — the sops webhook cert won't be issued."
-          gum confirm "Continue anyway?" || { echo "Run 'task deploy-cert-manager' first."; exit 1; }
+        # 1) CERT-MANAGER — the sops-operator's conversion webhook needs it. Often already
+        #    present (managed elsewhere), so skip if found; otherwise offer to deploy it.
+        if kubectl get deploy -n cert-manager cert-manager >/dev/null 2>&1; then
+          echo "✓ cert-manager already present — skipping."
+        elif gum confirm "cert-manager not found. Deploy it? (required by sops-operator)"; then
+          echo "▶ APPLYING: infra/cert-manager.yaml.gotmpl"
+          dagger call -m {{ .HELM_DAGGER_MODULE }} helmfile-operation --operation apply \
+            --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/cert-manager.yaml.gotmpl" \
+            --kube-config file://${KUBECONFIG} --progress plain -vv
+          kubectl -n cert-manager rollout status deploy/cert-manager --timeout=180s
+          kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
+        else
+          echo "⚠️  Proceeding without cert-manager — the sops webhook cert won't be issued."
         fi
 
         gum confirm "Deploy sops-secrets-operator ({{ .SOPS_OPERATOR_REF }}) to ${KUBECONFIG}?" || exit 0
 
-        # 1) OPERATOR — CRDs + RBAC + controller + webhook Issuer/Certificate (kustomize; no helm chart exists).
+        # 2) OPERATOR — CRDs + RBAC + controller + webhook Issuer/Certificate (kustomize; no helm chart exists).
         echo "▶ kubectl apply -k {{ .SOPS_OPERATOR_KUSTOMIZE }}?ref={{ .SOPS_OPERATOR_REF }}"
         kubectl apply -k "{{ .SOPS_OPERATOR_KUSTOMIZE }}?ref={{ .SOPS_OPERATOR_REF }}"
-        kubectl -n sops-secrets-operator-system rollout status deploy \
-          -l control-plane=controller-manager --timeout=180s || \
-          kubectl -n sops-secrets-operator-system rollout status deployment --timeout=180s
+        kubectl -n sops-secrets-operator-system rollout status deployment --timeout=180s
 
-        # 2) AGE KEY — the sops-age-key Secret the InlineSopsSecret CRs decrypt with.
+        # 3) AGE KEY — the sops-age-key Secret the InlineSopsSecret CRs decrypt with.
         #    keyRef resolves in the CR's namespace, so install it into every consumer namespace.
         for ns in {{ .KEY_NAMESPACES }}; do
           kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
@@ -722,70 +676,56 @@ tasks:
           echo "  ✓ {{ .AGE_SECRET_NAME }} in $ns"
         done
 
-        echo "✅ SOPS-SECRETS-OPERATOR DEPLOYED"
+        echo "✅ SECRETS LAYER READY (cert-manager + sops-operator + age key)"
         kubectl -n sops-secrets-operator-system get pods
 
   # ---------------------------------------------------------------------------
-  # Cluster bootstrap — three tiers:
-  #   substrate  : create-kind-cluster (kind + cilium)          — any cluster type
-  #   foundation : deploy-foundation (cert-manager+sops+openebs) — any cluster type
-  #   profile    : profile-<name> (the cluster TYPE)            — machinery, gitops, …
-  # `bootstrap` orchestrates substrate → foundation → chosen profile(s). Add a new
-  # cluster type by adding a profile-<name> task and listing it in bootstrap.
+  # Cluster bootstrap — two tiers:
+  #   substrate : create-kind-cluster (kind + cilium)  — any cluster type
+  #   profile   : profile-<name> (the cluster TYPE)    — machinery, gitops, …
+  # `bootstrap` orchestrates substrate → chosen profile(s). Each profile installs
+  # exactly the platform pieces it needs (the machinery profile brings its own
+  # secrets layer, storage/tekton, crossplane, …). Add a new cluster type by adding
+  # a profile-<name> task and listing it in bootstrap.
   # ---------------------------------------------------------------------------
 
   bootstrap:
-    desc: 'Build a cluster: substrate (kind+cilium) → foundation → choose profile(s) [machinery, …]'
+    desc: 'Build a cluster: substrate (kind+cilium) → choose profile(s) [machinery, …]'
     cmds:
       - |
         set -e
         gum style --border double --padding "1 2" --margin 1 \
           "CLUSTER BOOTSTRAP" \
-          "substrate (kind+cilium) → foundation (cert-manager/sops/openebs) → profile(s)"
+          "substrate (kind+cilium) → profile(s)"
 
         step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
 
         # 1) SUBSTRATE — kind cluster + cilium CNI (profile-agnostic).
         step "substrate: kind cluster + cilium CNI" create-kind-cluster
-        # 2) FOUNDATION — cert-manager + sops + openebs (profile-agnostic).
-        step "foundation: cert-manager + sops + openebs" deploy-foundation
 
-        # 3) PROFILE(S) — the cluster type. Extend with more profile-<name> tasks.
+        # 2) PROFILE(S) — the cluster type. Extend with more profile-<name> tasks.
         PROFILES=$(gum choose --no-limit --header "Cluster profile(s) to apply" \
           --selected="machinery" machinery)
-        [ -z "$PROFILES" ] && { echo "No profile selected — cluster has substrate+foundation only."; exit 0; }
+        [ -z "$PROFILES" ] && { echo "No profile selected — cluster has substrate only."; exit 0; }
         for p in $PROFILES; do
           step "profile: $p" "profile-$p"
         done
 
         gum style --foreground 42 "✅ BOOTSTRAP COMPLETE"
 
-  deploy-foundation:
-    desc: 'Foundation layer (profile-agnostic): cert-manager → sops → openebs'
-    cmds:
-      - |
-        set -e
-        gum style --border normal --padding "0 1" "FOUNDATION: cert-manager → sops → openebs"
-        step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
-        # cert-manager first — it issues the sops-secrets-operator webhook cert.
-        step "cert-manager" deploy-cert-manager
-        # sops-secrets-operator + age key Secret (crossplane-system, tekton-ci).
-        step "sops-secrets-operator + age key" deploy-sops
-        # openebs local-pv storage.
-        step "openebs (local-pv storage)" deploy-openebs
-        gum style --foreground 42 "✅ FOUNDATION READY"
-
   profile-machinery:
-    desc: 'Machinery profile (VM builder): tekton → crossplane → Configuration packages → capabilities'
+    desc: 'Machinery profile (VM builder): secrets → storage/tekton → crossplane → configurations → capabilities'
     cmds:
       - |
         set -e
         gum style --border normal --padding "0 1" \
           "PROFILE: machinery (VM builder)" \
-          "tekton → crossplane → configurations → capabilities"
+          "sops-operator → openebs/tekton → crossplane → configurations → capabilities"
         step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
-        # tekton — runs the ansible base-OS PipelineRuns emitted by vspherevm+ansible.
-        step "tekton" deploy-tekton
+        # secrets layer: cert-manager (if missing) + sops-operator + age key (crossplane-system, tekton-ci).
+        step "secrets layer (cert-manager + sops-operator + age key)" deploy-sops-operator
+        # storage + tekton — runs the ansible base-OS PipelineRuns emitted by vspherevm+ansible.
+        step "storage + tekton (openebs + pipelines)" deploy-tekton
         # crossplane core + providers + config + provider-configs (deploy-crossplane WAITS
         # for the core rollout + pkg.crossplane.io CRDs — the deploy-platform bundle races them).
         step "crossplane (core + providers + config)" deploy-crossplane

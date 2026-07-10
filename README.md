@@ -15,36 +15,34 @@ Composable infrastructure for fast-moving teams
 ## Cluster Bootstrap
 
 Build a cluster from scratch with the interactive [`Taskfile`](./Taskfile.yaml) (gum-driven,
-step-by-step confirmations). It's structured in three tiers so it scales to multiple cluster types:
-
-| Tier | Task | What |
-|------|------|------|
-| **substrate** | `create-kind-cluster` | kind cluster + cilium CNI |
-| **foundation** | `deploy-foundation` | cert-manager → sops-secrets-operator (+ age key) → openebs |
-| **profile** | `profile-machinery` | tekton → crossplane → Configuration packages → capabilities |
+step-by-step confirmations). Two tiers: a **substrate** (any cluster type) and a **profile**
+(the cluster TYPE). `task bootstrap` runs substrate → chosen profile(s); each profile installs
+exactly the platform pieces it needs.
 
 ```bash
-# one guided run: substrate → foundation → choose profile(s)
-task bootstrap
-
-# …or run any tier / building block on its own
-task create-kind-cluster
-task deploy-foundation
-task profile-machinery
+task bootstrap              # substrate → gum-choose profile(s) [machinery, …]
 ```
 
-The **machinery** profile makes the cluster a VM builder: apply a `NativeVsphereVM` XR and
-Crossplane provisions a VM in vSphere (labul/labda), optionally running an Ansible base-OS
-playbook via Tekton. `deploy-capabilities` can enable multiple environments at once
-(labul **and** labda on one cluster). Add a new cluster type as a `profile-<name>` task and
-list it in `bootstrap` — substrate + foundation stay unchanged.
+### Machinery cluster (VM builder)
 
-**Building-block tasks** (interactive, reusable standalone): `deploy-cert-manager`,
-`deploy-sops`, `deploy-openebs`, `deploy-tekton`, `deploy-crossplane`, `deploy-configurations`,
-`deploy-capabilities`. List everything with `task` (or `task do`).
+`task profile-machinery` runs steps 2–6 below in order (or run any task standalone):
+
+| # | Task | What it installs |
+|---|------|------------------|
+| 1 | `create-kind-cluster` | **substrate** — kind cluster + cilium CNI (free-port defaults, collision guard) |
+| 2 | `deploy-sops-operator` | cert-manager (only if missing) + sops-secrets-operator + age-key Secret (`crossplane-system`, `tekton-ci`) |
+| 3 | `deploy-tekton` | OpenEBS local-pv storage (gum-confirmed) + Tekton operator/pipeline |
+| 4 | `deploy-crossplane` | Crossplane core → providers → functions/config → provider-configs (waited, no CRD race) |
+| 5 | `deploy-configurations` | vspherevm/proxmoxvm Configuration package(s) + wait for their provider CRDs |
+| 6 | `deploy-capabilities` | per-env EnvironmentConfig + ClusterProviderConfig + creds (env-map `labul`/`labda`; backend `none`\|`eso`\|`sops`) |
+
+Once built, apply a `NativeVsphereVM` XR with `spec.environmentConfig: labul` and Crossplane
+provisions a VM in vSphere; add `spec.ansible.enabled: true` to run an Ansible base-OS playbook
+via Tekton. `deploy-capabilities` can enable **multiple environments at once** (labul **and**
+labda on one cluster). Add a new cluster type as a `profile-<name>` task and list it in `bootstrap`.
 
 > The `sops` credentials backend needs the project age private key in your environment —
-> `export SOPS_AGE_KEY=…` before `deploy-sops` / `deploy-capabilities`.
+> `export SOPS_AGE_KEY=…` before `deploy-sops-operator` / `deploy-capabilities`.
 
 Tear down with `task destroy-kind-cluster` — it warns on orphaned Crossplane-managed VMs and
 prunes the leftover kubeconfig.
