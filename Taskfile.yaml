@@ -49,17 +49,19 @@ tasks:
         fi
 
   create-kind-cluster:
-    desc: Create a new KinD cluster (from a profile or generated interactively)
+    desc: Create a new KinD cluster (from a topology or generated interactively)
     cmds:
       - |
         set -e
         mkdir -p {{ .KUBECONFIG_PATH }} || true
 
+        # NB: "topology" = kind node/network shape (this task's concern). Distinct from
+        # a stuttgart-things "profile" (cluster TYPE, e.g. machinery) applied by `bootstrap`.
         MODE=$(gum choose --header "How do you want to create the cluster?" \
-          "existing-profile" "generate-kcl")
+          "existing-topology" "generate-kcl")
 
-        if [ "$MODE" = "existing-profile" ]; then
-          PROFILE=$(echo "{{.profiles | join "\n"}}" | gum choose --header "Choose a profile")
+        if [ "$MODE" = "existing-topology" ]; then
+          PROFILE=$(echo "{{.topologies | join "\n"}}" | gum choose --header "Choose a kind topology")
           echo "You chose: $PROFILE"
           CLUSTER_NAME=$(basename "$PROFILE" .yaml)
         else
@@ -175,7 +177,8 @@ tasks:
         echo
         echo "To use this cluster:  export KUBECONFIG=$KUBECONFIG_FILE"
     vars:
-      profiles:
+      # kind node/network topologies (NOT cluster-type profiles — see bootstrap).
+      topologies:
         - keycloak/keycloak-cluster.yaml
       k8s_versions:
         - v1.34.0
@@ -185,17 +188,17 @@ tasks:
         - v1.30.8
       KUBECONFIG_PATH: ~/.kube
       # generate-kcl mode: stuttgart-things KCL kind-cluster module rendered via Dagger
-      KCL_DAGGER_MODULE: github.com/stuttgart-things/dagger/kcl
+      KCL_DAGGER_MODULE: github.com/stuttgart-things/dagger/kcl@v0.119.0
       KIND_OCI_MODULE: ghcr.io/stuttgart-things/kind-cluster:0.4.0
       # optional CNI install (needed when disableDefaultCNI=true, i.e. no built-in CNI)
-      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       CILIUM_CRDS_KUSTOMIZE: https://github.com/stuttgart-things/helm/infra/crds/cilium
       CILIUM_HELMFILE_REF: "git::https://github.com/stuttgart-things/helm.git@infra/cilium.yaml.gotmpl"
 
   deploy-platform:
     desc: Deploy the platform bundle (cilium/openebs/tekton/crossplane) via the central helmfile
     vars:
-      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
       BUNDLE_DIR: bundles
       BUNDLE_FILE: platform.yaml.gotmpl
@@ -262,7 +265,7 @@ tasks:
   deploy-crossplane:
     desc: Deploy Crossplane (core, providers, functions/configs, provider-configs) via dagger helmfile-operation
     vars:
-      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
       KUBECONFIG_PATH: ~/.kube
       ALL_KUBECONFIGS:
@@ -321,7 +324,7 @@ tasks:
   deploy-tekton:
     desc: Deploy Tekton (operator + pipeline component) via dagger helmfile-operation
     vars:
-      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.57.0
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
       HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
       KUBECONFIG_PATH: ~/.kube
       ALL_KUBECONFIGS:
@@ -362,6 +365,69 @@ tasks:
         kubectl get tektonpipeline
         kubectl -n tekton-pipelines get pods
 
+  deploy-configurations:
+    desc: 'Install crossplane Configuration packages (vspherevm/proxmoxvm) + wait for their provider CRDs — the "crossplane config" step before capabilities'
+    vars:
+      KUBECONFIG_PATH: ~/.kube
+      # Configuration OCI packages (each pulls its provider via dependsOn).
+      VSPHEREVM_PKG: ghcr.io/stuttgart-things/crossplane-configurations/vspherevm:v0.6.0
+      PROXMOXVM_PKG: ghcr.io/stuttgart-things/crossplane-configurations/proxmoxvm:v0.4.0
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        CFGS=$(gum choose --no-limit --header "Configuration packages (each installs its provider via dependsOn)" \
+          --selected="vspherevm" vspherevm proxmoxvm)
+        [ -z "$CFGS" ] && { echo "Nothing selected."; exit 0; }
+
+        pkg() { case "$1" in vspherevm) echo {{ .VSPHEREVM_PKG }};; proxmoxvm) echo {{ .PROXMOXVM_PKG }};; esac; }
+        # The ClusterProviderConfig CRD each provider registers — gated on before capabilities.
+        crd() { case "$1" in
+          vspherevm) echo clusterproviderconfigs.vspherevm.m.stuttgart-things.com;;
+          proxmoxvm) echo clusterproviderconfigs.proxmoxbpg.m.crossplane.io;;
+        esac; }
+
+        gum confirm "Install Configuration(s) [${CFGS//$'\n'/ }] to ${KUBECONFIG}?" || exit 0
+
+        # 1) APPLY the Configuration CRs (printf avoids heredoc-indent pitfalls in YAML).
+        for cfg in $CFGS; do
+          echo "▶ Configuration/$cfg  ($(pkg "$cfg"))"
+          printf 'apiVersion: pkg.crossplane.io/v1\nkind: Configuration\nmetadata:\n  name: %s\nspec:\n  package: %s\n' \
+            "$cfg" "$(pkg "$cfg")" | kubectl apply -f -
+        done
+
+        # 2) WAIT — Configuration Healthy, then its provider's ClusterProviderConfig CRD.
+        #    The provider is pulled transitively via dependsOn, so its CRD registers a
+        #    little AFTER the Configuration reports Healthy. Capabilities' ClusterProviderConfig
+        #    needs that CRD (this is the ordering that a single capability-chart apply races).
+        #    (Cross-mirror function deps — e.g. function-kcl xpkg.crossplane.io vs installed
+        #    xpkg.upbound.io — resolve by digest after a brief "missing dependencies" blip.)
+        for cfg in $CFGS; do
+          echo "⏳ $cfg: Configuration Healthy..."
+          kubectl wait configuration.pkg.crossplane.io/$cfg --for=condition=Healthy --timeout=300s
+          echo "⏳ $cfg: provider CRD $(crd "$cfg")..."
+          for i in $(seq 1 60); do
+            kubectl get crd "$(crd "$cfg")" >/dev/null 2>&1 && break
+            sleep 5
+          done
+          kubectl wait --for=condition=established crd/"$(crd "$cfg")" --timeout=120s
+          echo "  ✓ $cfg ready"
+        done
+
+        echo "✅ CONFIGURATIONS READY"
+        echo "   → run deploy-capabilities with 'Install the Configuration OCI package?' = No"
+        kubectl get configuration.pkg.crossplane.io
+        kubectl get provider.pkg.crossplane.io \
+          -o custom-columns=NAME:.metadata.name,HEALTHY:.status.conditions'[?(@.type=="Healthy")].status'
+
   deploy-capabilities:
     desc: Deploy vspherevm/ansible/proxmoxvm platform capabilities from OCI charts (env-map) to a cluster
     vars:
@@ -387,7 +453,20 @@ tasks:
         kubectl get nodes
 
         # SELECT ENV (chart env-map key) + CAPABILITIES
-        ENV=$(printf 'labda\nlabul\n' | gum choose --header "Environment (chart env-map)")
+        # NOTE: ansible depends on vspherevm. The `ansible` capability only lands the
+        # ansible-credentials Secret (tekton-ci) + EnvironmentConfig; the AnsibleRun
+        # CRD it relies on is provided by the `ansible-run` Configuration, which is
+        # pulled TRANSITIVELY via the vspherevm Configuration's dependsOn (installed by
+        # deploy-configurations). So a vspherevm+ansible cluster is the supported combo;
+        # deploying ansible ALONE gives you creds but no AnsibleRun CRD until vspherevm
+        # (its Configuration) is also installed.
+        # ENV(S) — multi-select: one cluster can serve several vSphere envs at once.
+        # vspherevm/proxmoxvm resources are env-suffixed (…-labul, …-labda) so they
+        # coexist. ansible is env-INDEPENDENT (fixed-name EnvironmentConfig ansible-run-
+        # defaults / ansible-credentials Secret / rbac in tekton-ci) → installed ONCE
+        # regardless of how many envs you pick (two ansible releases would collide).
+        ENVS=$(printf 'labda\nlabul\n' | gum choose --no-limit --selected="labul" --header "Environment(s) (chart env-map)")
+        [ -z "$ENVS" ] && { echo "No environment selected."; exit 0; }
         CAPS=$(gum choose --no-limit --header "Capabilities to deploy" \
           --selected="vspherevm,ansible" vspherevm ansible proxmoxvm)
         [ -z "$CAPS" ] && { echo "Nothing selected."; exit 0; }
@@ -400,39 +479,249 @@ tasks:
         # are already applied by hand (vsphere/proxmox only; ansible has no package).
         if gum confirm "Install the Configuration OCI package? (No = XRD/Composition already present, e.g. kind)"; then INSTALL_CFG=true; else INSTALL_CFG=false; fi
 
-        gum confirm "Deploy [${CAPS//$'\n'/ }] env=$ENV backend=$BACKEND to ${KUBECONFIG}?" || exit 0
+        gum confirm "Deploy [${CAPS//$'\n'/ }] env(s)=[${ENVS//$'\n'/ }] backend=$BACKEND to ${KUBECONFIG}?" || exit 0
 
         ver() { case "$1" in vspherevm) echo {{ .VSPHEREVM_VER }};; ansible) echo {{ .ANSIBLE_VER }};; proxmoxvm) echo {{ .PROXMOXVM_VER }};; esac; }
-        # creds Secret name prefix per capability (for the sops blob filename).
+        # creds blob per capability+env ($2). ansible's blob is env-independent.
         credfile() {
           case "$1" in
-            vspherevm) echo "$SECRETS_DIR/vsphere-creds-$ENV.enc.yaml";;
-            proxmoxvm) echo "$SECRETS_DIR/proxmox-creds-$ENV.enc.yaml";;
+            vspherevm) echo "$SECRETS_DIR/vsphere-creds-$2.enc.yaml";;
+            proxmoxvm) echo "$SECRETS_DIR/proxmox-creds-$2.enc.yaml";;
             ansible)   echo "$SECRETS_DIR/ansible-credentials.enc.yaml";;
           esac
         }
         flags() {
-          local cap="$1" out=""
+          local cap="$1" env="$2" out=""
           if [ "$cap" = "ansible" ]; then
             out="--set sshCredentials.backend=$BACKEND"
-            [ "$BACKEND" = "sops" ] && out="$out --set-file sshCredentials.sops.encryptedCredentials=$(credfile "$cap")"
+            [ "$BACKEND" = "sops" ] && out="$out --set-file sshCredentials.sops.encryptedCredentials=$(credfile "$cap" "$env")"
           else
             out="--set secretStore.backend=$BACKEND --set configuration.install=$INSTALL_CFG"
-            [ "$BACKEND" = "sops" ] && out="$out --set-file secretStore.sops.encryptedCredentials=$(credfile "$cap")"
+            [ "$BACKEND" = "sops" ] && out="$out --set-file secretStore.sops.encryptedCredentials=$(credfile "$cap" "$env")"
           fi
           echo "$out"
         }
 
+        FIRST_ENV=$(echo "$ENVS" | head -1)
         for cap in $CAPS; do
-          echo "▶ $cap ($ENV) v$(ver "$cap") backend=$BACKEND"
-          helm upgrade --install "$cap-$ENV" {{ .CHARTS_OCI }}/"$cap" --version "$(ver "$cap")" \
-            --set environment="$ENV" $(flags "$cap") \
-            -n crossplane-system --create-namespace
+          if [ "$cap" = "ansible" ]; then
+            # env-independent → single release "ansible" (uses the first selected env only
+            # for the env-map selector; in sops mode that doesn't affect the materialized creds).
+            echo "▶ ansible (env-independent, one install) v$(ver ansible) backend=$BACKEND"
+            helm upgrade --install ansible {{ .CHARTS_OCI }}/ansible --version "$(ver ansible)" \
+              --set environment="$FIRST_ENV" $(flags ansible "$FIRST_ENV") \
+              -n crossplane-system --create-namespace
+          else
+            for env in $ENVS; do
+              echo "▶ $cap ($env) v$(ver "$cap") backend=$BACKEND"
+              helm upgrade --install "$cap-$env" {{ .CHARTS_OCI }}/"$cap" --version "$(ver "$cap")" \
+                --set environment="$env" $(flags "$cap" "$env") \
+                -n crossplane-system --create-namespace
+            done
+          fi
         done
 
         echo "✅ CAPABILITIES DEPLOYED"
         helm list -n crossplane-system | grep -E 'vspherevm|ansible|proxmoxvm' || true
         kubectl get environmentconfig 2>/dev/null || true
+
+  deploy-cert-manager:
+    desc: Deploy cert-manager (+ sthings config) via dagger helmfile-operation
+    vars:
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
+      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        gum confirm "Deploy cert-manager to ${KUBECONFIG}?" || exit 0
+
+        echo "▶ APPLYING: infra/cert-manager.yaml.gotmpl"
+        dagger call -m {{ .HELM_DAGGER_MODULE }} \
+          helmfile-operation \
+          --operation apply \
+          --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/cert-manager.yaml.gotmpl" \
+          --kube-config file://${KUBECONFIG} \
+          --progress plain -vv
+
+        # WAIT — sops-secrets-operator's webhook cert depends on a ready cert-manager.
+        kubectl -n cert-manager rollout status deploy/cert-manager --timeout=180s
+        kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
+
+        echo "✅ CERT-MANAGER DEPLOYED"
+        kubectl -n cert-manager get pods
+
+  deploy-openebs:
+    desc: Deploy OpenEBS (local-pv storage) via dagger helmfile-operation
+    vars:
+      HELM_DAGGER_MODULE: github.com/stuttgart-things/dagger/helm@v0.119.0
+      HELM_GIT_REPO: git::https://github.com/stuttgart-things/helm.git
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        gum confirm "Deploy OpenEBS to ${KUBECONFIG}?" || exit 0
+
+        echo "▶ APPLYING: infra/openebs.yaml.gotmpl"
+        dagger call -m {{ .HELM_DAGGER_MODULE }} \
+          helmfile-operation \
+          --operation apply \
+          --helmfile-ref "{{ .HELM_GIT_REPO }}@infra/openebs.yaml.gotmpl" \
+          --kube-config file://${KUBECONFIG} \
+          --progress plain -vv
+
+        kubectl -n openebs rollout status deploy/openebs-localpv-provisioner --timeout=180s
+
+        echo "✅ OPENEBS DEPLOYED"
+        kubectl -n openebs get pods
+
+  deploy-sops:
+    desc: Deploy sops-secrets-operator (kustomize) + install the age private key Secret (needs cert-manager + $SOPS_AGE_KEY)
+    vars:
+      SOPS_OPERATOR_REF: v0.8.4
+      SOPS_OPERATOR_KUSTOMIZE: https://github.com/stuttgart-things/sops-secrets-operator/config/default
+      # Namespaces where consumer CRs (InlineSopsSecret) live — keyRef resolves in the CR's own namespace.
+      KEY_NAMESPACES: crossplane-system tekton-ci
+      AGE_SECRET_NAME: sops-age-key
+      AGE_SECRET_KEY: age.agekey
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+
+        # PRECONDITION — the age *private* key must be in the environment (never committed).
+        if [ -z "${SOPS_AGE_KEY:-}" ]; then
+          echo "✋ SOPS_AGE_KEY is not set. Export the project age private key first:"
+          echo "   export SOPS_AGE_KEY=\$(cat /path/to/keys.txt)   # or your keychain"
+          exit 1
+        fi
+
+        # SELECT KUBECONFIG
+        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        echo "SWITCHING TO ${KUBECONFIG}"
+        kubectl get nodes
+
+        # cert-manager gate — the operator's conversion webhook needs it (see repo README).
+        if ! kubectl get deploy -n cert-manager cert-manager >/dev/null 2>&1; then
+          echo "⚠️  cert-manager not found — the sops webhook cert won't be issued."
+          gum confirm "Continue anyway?" || { echo "Run 'task deploy-cert-manager' first."; exit 1; }
+        fi
+
+        gum confirm "Deploy sops-secrets-operator ({{ .SOPS_OPERATOR_REF }}) to ${KUBECONFIG}?" || exit 0
+
+        # 1) OPERATOR — CRDs + RBAC + controller + webhook Issuer/Certificate (kustomize; no helm chart exists).
+        echo "▶ kubectl apply -k {{ .SOPS_OPERATOR_KUSTOMIZE }}?ref={{ .SOPS_OPERATOR_REF }}"
+        kubectl apply -k "{{ .SOPS_OPERATOR_KUSTOMIZE }}?ref={{ .SOPS_OPERATOR_REF }}"
+        kubectl -n sops-secrets-operator-system rollout status deploy \
+          -l control-plane=controller-manager --timeout=180s || \
+          kubectl -n sops-secrets-operator-system rollout status deployment --timeout=180s
+
+        # 2) AGE KEY — the sops-age-key Secret the InlineSopsSecret CRs decrypt with.
+        #    keyRef resolves in the CR's namespace, so install it into every consumer namespace.
+        for ns in {{ .KEY_NAMESPACES }}; do
+          kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+          # value never echoed; --dry-run|apply keeps it idempotent.
+          kubectl -n "$ns" create secret generic {{ .AGE_SECRET_NAME }} \
+            --from-literal={{ .AGE_SECRET_KEY }}="$SOPS_AGE_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "  ✓ {{ .AGE_SECRET_NAME }} in $ns"
+        done
+
+        echo "✅ SOPS-SECRETS-OPERATOR DEPLOYED"
+        kubectl -n sops-secrets-operator-system get pods
+
+  # ---------------------------------------------------------------------------
+  # Cluster bootstrap — three tiers:
+  #   substrate  : create-kind-cluster (kind + cilium)          — any cluster type
+  #   foundation : deploy-foundation (cert-manager+sops+openebs) — any cluster type
+  #   profile    : profile-<name> (the cluster TYPE)            — machinery, gitops, …
+  # `bootstrap` orchestrates substrate → foundation → chosen profile(s). Add a new
+  # cluster type by adding a profile-<name> task and listing it in bootstrap.
+  # ---------------------------------------------------------------------------
+
+  bootstrap:
+    desc: 'Build a cluster: substrate (kind+cilium) → foundation → choose profile(s) [machinery, …]'
+    cmds:
+      - |
+        set -e
+        gum style --border double --padding "1 2" --margin 1 \
+          "CLUSTER BOOTSTRAP" \
+          "substrate (kind+cilium) → foundation (cert-manager/sops/openebs) → profile(s)"
+
+        step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
+
+        # 1) SUBSTRATE — kind cluster + cilium CNI (profile-agnostic).
+        step "substrate: kind cluster + cilium CNI" create-kind-cluster
+        # 2) FOUNDATION — cert-manager + sops + openebs (profile-agnostic).
+        step "foundation: cert-manager + sops + openebs" deploy-foundation
+
+        # 3) PROFILE(S) — the cluster type. Extend with more profile-<name> tasks.
+        PROFILES=$(gum choose --no-limit --header "Cluster profile(s) to apply" \
+          --selected="machinery" machinery)
+        [ -z "$PROFILES" ] && { echo "No profile selected — cluster has substrate+foundation only."; exit 0; }
+        for p in $PROFILES; do
+          step "profile: $p" "profile-$p"
+        done
+
+        gum style --foreground 42 "✅ BOOTSTRAP COMPLETE"
+
+  deploy-foundation:
+    desc: 'Foundation layer (profile-agnostic): cert-manager → sops → openebs'
+    cmds:
+      - |
+        set -e
+        gum style --border normal --padding "0 1" "FOUNDATION: cert-manager → sops → openebs"
+        step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
+        # cert-manager first — it issues the sops-secrets-operator webhook cert.
+        step "cert-manager" deploy-cert-manager
+        # sops-secrets-operator + age key Secret (crossplane-system, tekton-ci).
+        step "sops-secrets-operator + age key" deploy-sops
+        # openebs local-pv storage.
+        step "openebs (local-pv storage)" deploy-openebs
+        gum style --foreground 42 "✅ FOUNDATION READY"
+
+  profile-machinery:
+    desc: 'Machinery profile (VM builder): tekton → crossplane → Configuration packages → capabilities'
+    cmds:
+      - |
+        set -e
+        gum style --border normal --padding "0 1" \
+          "PROFILE: machinery (VM builder)" \
+          "tekton → crossplane → configurations → capabilities"
+        step() { if gum confirm "▶ $1  (task: $2)?"; then task "$2"; else echo "  ⏭  skipped: $1"; fi; }
+        # tekton — runs the ansible base-OS PipelineRuns emitted by vspherevm+ansible.
+        step "tekton" deploy-tekton
+        # crossplane core + providers + config + provider-configs (deploy-crossplane WAITS
+        # for the core rollout + pkg.crossplane.io CRDs — the deploy-platform bundle races them).
+        step "crossplane (core + providers + config)" deploy-crossplane
+        # Configuration packages + their providers. Must precede capabilities: the capability
+        # chart's ClusterProviderConfig needs the provider CRD this step installs & heals.
+        step "crossplane config (Configuration packages + providers)" deploy-configurations
+        # capabilities (vspherevm/ansible/proxmoxvm, backend=sops). Answer
+        # 'Install the Configuration OCI package?' = No — the step above already did it.
+        step "capabilities (vspherevm/ansible/proxmoxvm)" deploy-capabilities
+        gum style --foreground 42 "✅ MACHINERY PROFILE READY"
 
   do:
     desc: Select a task to run
