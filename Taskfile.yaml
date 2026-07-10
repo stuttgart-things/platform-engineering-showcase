@@ -73,83 +73,136 @@ tasks:
         fi
 
   create-kind-cluster:
-    desc: Create a new KinD cluster (from a topology or generated interactively)
+    desc: Create a new KinD cluster (KCL-generated config via Dagger, interactive)
     cmds:
       - |
         set -e
         mkdir -p {{ .KUBECONFIG_PATH }} || true
 
-        # NB: "topology" = kind node/network shape (this task's concern). Distinct from
-        # a stuttgart-things "profile" (cluster TYPE, e.g. machinery) applied by `bootstrap`.
-        MODE=$(gum choose --header "How do you want to create the cluster?" \
-          "existing-topology" "generate-kcl")
+        # Generate the kind config via the stuttgart-things KCL OCI module through
+        # Dagger. Show host ports already published by existing KinD nodes so you
+        # don't collide (an apiServer/ingress port can only be owned by one cluster).
+        echo "== Existing KinD clusters =="
+        kind get clusters || true
+        echo
+        echo "== KinD node containers & published ports =="
+        docker ps --filter "label=io.x-k8s.kind.cluster" || true
+        echo
+        # All host ports currently allocated — docker publishes (ANY container, not
+        # just kind) + listening sockets — so you can pick a free apiServer / range.
+        used_ports() {
+          { docker ps 2>/dev/null | grep -oE ':[0-9]+->' | grep -oE '[0-9]+'
+            ss -ltnH 2>/dev/null | awk '{print $4}' | grep -oE '[0-9]+$'; } | sort -un
+        }
+        echo "== Host ports already in use (docker + listeners) =="
+        used_ports | tr '\n' ' '; echo
+        echo
 
-        if [ "$MODE" = "existing-topology" ]; then
-          PROFILE=$(echo "{{.topologies | join "\n"}}" | gum choose --header "Choose a kind topology")
-          echo "You chose: $PROFILE"
-          CLUSTER_NAME=$(basename "$PROFILE" .yaml)
+        # Default apiServerAddress to this host's primary IP.
+        HOST_IP=$(ip route get 1.1.1.1 2>/dev/null \
+          | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')
+        [ -z "$HOST_IP" ] && HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+
+        CLUSTER_NAME=$(gum input --header "Cluster name" --value "kind")
+        K8S_VERSION=$(echo "{{.k8s_versions | join "\n"}}" | gum choose \
+          --header "Kubernetes version (kindest/node)")
+        API_ADDR=$(gum input --header "apiServerAddress" --value "$HOST_IP")
+        WORKER_COUNT=$(gum input --header "Number of worker nodes" --value "2")
+        case "$WORKER_COUNT" in
+          '' | *[!0-9]*) WORKER_COUNT=2 ;;
+        esac
+
+        # KCL booleans are capitalised (True/False).
+        if gum confirm "disableDefaultCNI = true?"; then CNI_KCL=True; else CNI_KCL=False; fi
+        KP_MODE=$(printf 'none\niptables\nipvs\n' | gum choose --header "kubeProxyMode")
+
+        # Ingress: DISABLED by default (only one cluster per machine can own 80/443).
+        if gum confirm --default=false "Enable ingress-ready (publish HTTP/HTTPS)? (only ONE cluster per machine)"; then
+          INGRESS_KCL=True
+          HTTP_PORT=$(gum input --header "Ingress HTTP host port -> container 80" --value "80")
+          HTTPS_PORT=$(gum input --header "Ingress HTTPS host port -> container 443" --value "443")
         else
-          # Render via the stuttgart-things KCL OCI module through Dagger.
-          # Show host ports already published by existing KinD nodes, so you
-          # don't collide on ingress ports (80/443 can only be owned by one
-          # cluster per machine).
-          echo "== Existing KinD clusters =="
-          kind get clusters || true
-          echo
-          echo "== KinD node containers & published ports =="
-          docker ps --filter "label=io.x-k8s.kind.cluster" || true
-          echo
-          echo "== Host ports already published by KinD nodes =="
-          docker ps --filter "label=io.x-k8s.kind.cluster" \
-            | grep -oE ':[0-9]+->' | tr -d ':->' | sort -un || true
-          echo
-
-          # Default apiServerAddress to this host's primary IP.
-          HOST_IP=$(ip route get 1.1.1.1 2>/dev/null \
-            | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')
-          [ -z "$HOST_IP" ] && HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-
-          CLUSTER_NAME=$(gum input --header "Cluster name" --value "kind")
-          K8S_VERSION=$(echo "{{.k8s_versions | join "\n"}}" | gum choose \
-            --header "Kubernetes version (kindest/node)")
-          API_ADDR=$(gum input --header "apiServerAddress" --value "$HOST_IP")
-          WORKER_COUNT=$(gum input --header "Number of worker nodes" --value "2")
-          case "$WORKER_COUNT" in
-            '' | *[!0-9]*) WORKER_COUNT=2 ;;
-          esac
-
-          # KCL booleans are capitalised (True/False).
-          if gum confirm "disableDefaultCNI = true?"; then CNI_KCL=True; else CNI_KCL=False; fi
-          KP_MODE=$(printf 'none\niptables\nipvs\n' | gum choose --header "kubeProxyMode")
-
-          # Ingress: add ingress-ready label + publish 80/443 (configurable host ports).
-          if gum confirm "Enable ingress-ready (publish HTTP/HTTPS)? (only ONE cluster per machine)"; then
-            INGRESS_KCL=True
-            HTTP_PORT=$(gum input --header "Ingress HTTP host port -> container 80" --value "80")
-            HTTPS_PORT=$(gum input --header "Ingress HTTPS host port -> container 443" --value "443")
-          else
-            INGRESS_KCL=False
-            HTTP_PORT=80
-            HTTPS_PORT=443
-          fi
-
-          API_PORT=$(gum input --header "API server host port (container 6443)" --value "6443")
-          RANGE_START=$(gum input --header "Extra port range start" --value "32443")
-          RANGE_COUNT=$(gum input --header "Number of extra ports in range" --value "6")
-          REGISTRY_MIRRORS=$(gum input \
-            --header "registryMirrors (JSON array; single entry avoids comma clash)" \
-            --value '["https://registry-1.docker.io"]')
-
-          PROFILE=$(mktemp --suffix=.yaml)
-          dagger call -m {{ .KCL_DAGGER_MODULE }} run \
-            --format-output=false \
-            --oci-source={{ .KIND_OCI_MODULE }} \
-            --parameters "clusterName=$CLUSTER_NAME,nodeImage=kindest/node:$K8S_VERSION,apiServerAddress=$API_ADDR,workerCount=$WORKER_COUNT,disableDefaultCNI=$CNI_KCL,kubeProxyMode=$KP_MODE,ingressReady=$INGRESS_KCL,ingressHttpHostPort=$HTTP_PORT,ingressHttpsHostPort=$HTTPS_PORT,apiServerPort=$API_PORT,portRangeStart=$RANGE_START,portRangeCount=$RANGE_COUNT,registryMirrors=$REGISTRY_MIRRORS" \
-            export --path="$PROFILE"
-
-          echo "Generated config ($PROFILE):"
-          cat "$PROFILE"
+          INGRESS_KCL=False
+          HTTP_PORT=80
+          HTTPS_PORT=443
         fi
+
+        # Port helpers — kind only errors on a clash AFTER the slow node-prep step,
+        # so we pre-offer FREE defaults and re-check before creating. POSIX-safe
+        # (task's shell interpreter is not bash): only `if`/`while` conditions,
+        # no `&&{...}` standalones or nested command-subs. (used_ports defined above.)
+        port_taken() { used_ports | grep -qx "$1"; }
+        free_port() {
+          p=$1
+          while port_taken "$p"; do p=$((p+1)); done
+          echo "$p"
+        }
+        free_range() {
+          s=$1; c=$2
+          while :; do
+            ok=1; i=0
+            while [ "$i" -lt "$c" ]; do
+              if port_taken $((s+i)); then ok=0; break; fi
+              i=$((i+1))
+            done
+            if [ "$ok" = 1 ]; then echo "$s"; return; fi
+            s=$((s+1))
+          done
+        }
+        needed_ports() {
+          n="$API_PORT"; i=0
+          while [ "$i" -lt "$RANGE_COUNT" ]; do n="$n $((RANGE_START+i))"; i=$((i+1)); done
+          if [ "$INGRESS_KCL" = "True" ]; then n="$n $HTTP_PORT $HTTPS_PORT"; fi
+          echo "$n"
+        }
+        clashes() {
+          c=""
+          for p in $(needed_ports); do
+            if port_taken "$p"; then c="$c $p"; fi
+          done
+          echo "$c"
+        }
+
+        # Defaults are pre-computed to FREE values (into vars, not inline in --value),
+        # so keeping them never clashes (apiServer 6443 is ALWAYS taken when another
+        # kind cluster exists).
+        RANGE_COUNT=$(gum input --header "Number of extra ports in range" --value "3")
+        case "$RANGE_COUNT" in '' | *[!0-9]*) RANGE_COUNT=3 ;; esac
+        DEF_API=$(free_port 6443)
+        DEF_RANGE=$(free_range 32443 "$RANGE_COUNT")
+        API_PORT=$(gum input --header "API server host port (container 6443)" --value "$DEF_API")
+        RANGE_START=$(gum input --header "Extra port range start" --value "$DEF_RANGE")
+        # EMPTY by default: the KCL module emits an old containerd-v1
+        # `registry.mirrors` patch, which containerd 2.x (kindest/node for k8s
+        # >=1.34/1.35) REJECTS ("`mirrors` cannot be set when `config_path` is
+        # provided") → CRI plugin fails to load → kubelet can't start → control-plane
+        # never comes up. The docker.io passthrough mirror adds no value anyway.
+        REGISTRY_MIRRORS=$(gum input \
+          --header "registryMirrors (JSON array; leave [] — non-empty breaks containerd 2.x nodes)" \
+          --value '[]')
+
+        # Safety net: if an override still clashes, auto-pick (default YES) or abort.
+        CLASH=$(clashes)
+        if [ -n "$CLASH" ]; then
+          echo "✋ Host port(s) already allocated:${CLASH}  (kind would publish:$(needed_ports))"
+          if gum confirm --default=true "Auto-pick free apiServer + extra-range ports?"; then
+            API_PORT=$(free_port "$API_PORT")
+            RANGE_START=$(free_range "$RANGE_START" "$RANGE_COUNT")
+            echo "→ apiServerPort=$API_PORT, extra range ${RANGE_START}..$((RANGE_START+RANGE_COUNT-1))"
+            CLASH=$(clashes)
+          fi
+          if [ -n "$CLASH" ]; then echo "✋ Still clashing:${CLASH} — free those ports or disable ingress. Aborting."; exit 1; fi
+        fi
+
+        PROFILE=$(mktemp --suffix=.yaml)
+        dagger call -m {{ .KCL_DAGGER_MODULE }} run \
+          --format-output=false \
+          --oci-source={{ .KIND_OCI_MODULE }} \
+          --parameters "clusterName=$CLUSTER_NAME,nodeImage=kindest/node:$K8S_VERSION,apiServerAddress=$API_ADDR,workerCount=$WORKER_COUNT,disableDefaultCNI=$CNI_KCL,kubeProxyMode=$KP_MODE,ingressReady=$INGRESS_KCL,ingressHttpHostPort=$HTTP_PORT,ingressHttpsHostPort=$HTTPS_PORT,apiServerPort=$API_PORT,portRangeStart=$RANGE_START,portRangeCount=$RANGE_COUNT,registryMirrors=$REGISTRY_MIRRORS" \
+          export --path="$PROFILE"
+
+        echo "Generated config ($PROFILE):"
+        cat "$PROFILE"
 
         if kind get clusters | grep -q "^$CLUSTER_NAME$"; then
           echo "Cluster $CLUSTER_NAME already exists."
@@ -201,17 +254,14 @@ tasks:
         echo
         echo "To use this cluster:  export KUBECONFIG=$KUBECONFIG_FILE"
     vars:
-      # kind node/network topologies (NOT cluster-type profiles — see bootstrap).
-      topologies:
-        - keycloak/keycloak-cluster.yaml
+      # 3 latest k8s versions shipped with the installed kind (v0.31.0 tops out at
+      # v1.35.0; v1.36+ node images are built for kind v0.32.0). Bump when kind is.
       k8s_versions:
-        - v1.34.0
-        - v1.33.1
-        - v1.32.2
-        - v1.31.4
-        - v1.30.8
+        - v1.35.0
+        - v1.34.3
+        - v1.33.7
       KUBECONFIG_PATH: ~/.kube
-      # generate-kcl mode: stuttgart-things KCL kind-cluster module rendered via Dagger
+      # stuttgart-things KCL kind-cluster module rendered via Dagger
       KCL_DAGGER_MODULE: github.com/stuttgart-things/dagger/kcl@v0.119.0
       KIND_OCI_MODULE: ghcr.io/stuttgart-things/kind-cluster:0.4.0
       # optional CNI install (needed when disableDefaultCNI=true, i.e. no built-in CNI)
