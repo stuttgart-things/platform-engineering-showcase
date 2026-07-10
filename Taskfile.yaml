@@ -283,10 +283,14 @@ tasks:
       - |
         set -e
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         # SELECT COMPONENTS (pre-selected = bundle defaults)
@@ -348,10 +352,14 @@ tasks:
       - |
         set -e
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         gum confirm "Deploy Crossplane to ${KUBECONFIG}?" || exit 0
@@ -407,10 +415,14 @@ tasks:
       - |
         set -e
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         # 1) OPENEBS — local-pv storage for Tekton PipelineRun workspaces. Optional:
@@ -459,10 +471,14 @@ tasks:
       - |
         set -e
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         CFGS=$(gum choose --no-limit --header "Configuration packages (each installs its provider via dependsOn)" \
@@ -527,10 +543,14 @@ tasks:
         set -e
         SECRETS_DIR=$(eval echo {{ .SECRETS_DIR }})
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         # SELECT ENV (chart env-map key) + CAPABILITIES
@@ -637,10 +657,14 @@ tasks:
           exit 1
         fi
 
-        # SELECT KUBECONFIG
-        SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
-        export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
-        echo "SWITCHING TO ${KUBECONFIG}"
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          echo "USING ${KUBECONFIG}"
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+          echo "SWITCHING TO ${KUBECONFIG}"
+        fi
         kubectl get nodes
 
         # 1) CERT-MANAGER — the sops-operator's conversion webhook needs it. Often already
@@ -736,6 +760,69 @@ tasks:
         # 'Install the Configuration OCI package?' = No — the step above already did it.
         step "capabilities (vspherevm/ansible/proxmoxvm)" deploy-capabilities
         gum style --foreground 42 "✅ MACHINERY PROFILE READY"
+
+  check-machinery:
+    desc: 'Read-only status: nodes, crossplane packages, per-env wiring, secrets, pods, VMs — is the cluster ready to build VMs?'
+    vars:
+      KUBECONFIG_PATH: ~/.kube
+      ALL_KUBECONFIGS:
+        sh: ls {{ .KUBECONFIG_PATH }} | grep -v "^cache$" | xargs -n1 printf '"%s" '
+    cmds:
+      - |
+        set -e
+        # KUBECONFIG — reuse the one already exported (confirm), else pick from ~/.kube.
+        if [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ] && gum confirm "Use current KUBECONFIG (${KUBECONFIG})?"; then
+          :
+        else
+          SELECTED_KUBECONFIG=$(gum choose {{ .ALL_KUBECONFIGS }})
+          export KUBECONFIG={{ .KUBECONFIG_PATH }}/${SELECTED_KUBECONFIG//\"/}
+        fi
+        gum style --border normal --padding "0 1" "MACHINERY STATUS — ${KUBECONFIG}"
+
+        echo "== nodes =="
+        kubectl get nodes 2>/dev/null || echo "  (cluster unreachable)"
+
+        echo; echo "== crossplane packages (default output shows INSTALLED/HEALTHY) =="
+        kubectl get provider.pkg.crossplane.io 2>/dev/null || echo "  (no providers)"
+        echo
+        kubectl get function.pkg.crossplane.io 2>/dev/null || echo "  (no functions)"
+        echo
+        kubectl get configuration.pkg.crossplane.io 2>/dev/null || echo "  (no configurations)"
+
+        echo; echo "== per-env wiring (vsphere) =="
+        kubectl get clusterproviderconfig.vspherevm.m.stuttgart-things.com 2>/dev/null || echo "  (no vsphere ClusterProviderConfigs)"
+        kubectl get environmentconfig 2>/dev/null || echo "  (no EnvironmentConfigs)"
+
+        echo; echo "== secrets =="
+        kubectl get secret -n crossplane-system 2>/dev/null | grep -E 'NAME|vsphere-creds|proxmox-creds|sops-age-key' || echo "  (no creds/age-key in crossplane-system)"
+        kubectl get secret -n tekton-ci 2>/dev/null | grep -E 'ansible-credentials|sops-age-key' || echo "  (no ansible-credentials/age-key in tekton-ci)"
+        kubectl get inlinesopssecret -A 2>/dev/null || echo "  (no InlineSopsSecrets)"
+
+        echo; echo "== capability helm releases =="
+        helm list -n crossplane-system 2>/dev/null | grep -E 'NAME|vspherevm|ansible|proxmoxvm' || echo "  (none)"
+
+        echo; echo "== pods (platform namespaces) =="
+        for ns in crossplane-system sops-secrets-operator-system tekton-pipelines cert-manager openebs; do
+          echo "-- $ns --"
+          kubectl get pods -n "$ns" --no-headers 2>/dev/null || echo "  (namespace absent)"
+        done
+
+        echo; echo "== existing VMs / XRs =="
+        kubectl get nativevspherevm.resources.stuttgart-things.com -A 2>/dev/null || echo "  (no NativeVsphereVM XRs / CRD absent)"
+        kubectl get virtualmachine.virtualmachine.vspherevm.m.stuttgart-things.com -A 2>/dev/null || true
+
+        # READINESS VERDICT — vspherevm Configuration Healthy + a ClusterProviderConfig + creds.
+        echo; echo "== readiness =="
+        CFG_OK=no; PC_OK=no; SEC_OK=no
+        if kubectl get configuration.pkg.crossplane.io vspherevm -o jsonpath='{.status.conditions[?(@.type=="Healthy")].status}' 2>/dev/null | grep -q '^True$'; then CFG_OK=yes; fi
+        if [ -n "$(kubectl get clusterproviderconfig.vspherevm.m.stuttgart-things.com -o name 2>/dev/null)" ]; then PC_OK=yes; fi
+        if kubectl get secret -n crossplane-system 2>/dev/null | grep -q vsphere-creds; then SEC_OK=yes; fi
+        echo "  vspherevm Configuration Healthy: $CFG_OK | ClusterProviderConfig: $PC_OK | vsphere-creds Secret: $SEC_OK"
+        if [ "$CFG_OK" = yes ] && [ "$PC_OK" = yes ] && [ "$SEC_OK" = yes ]; then
+          gum style --foreground 42 "✅ READY — apply a NativeVsphereVM with spec.environmentConfig=<env> to build a VM"
+        else
+          gum style --foreground 196 "✗ NOT ready — see the three checks above (need deploy-configurations + deploy-capabilities)"
+        fi
 
   do:
     desc: Select a task to run
