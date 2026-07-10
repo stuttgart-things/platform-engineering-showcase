@@ -29,7 +29,9 @@ tasks:
         - keycloak
 
   destroy-kind-cluster:
-    desc: Destroy a KinD cluster
+    desc: Destroy a KinD cluster (warns on orphaned Crossplane-managed infra, prunes its kubeconfig)
+    vars:
+      KUBECONFIG_PATH: ~/.kube
     cmds:
       - |
         CLUSTERS=$(kind get clusters)
@@ -40,10 +42,32 @@ tasks:
 
         CLUSTER_NAME=$(echo "$CLUSTERS" | gum choose)
         echo "You chose: $CLUSTER_NAME"
+        # create-kind-cluster writes the kubeconfig to KUBECONFIG_PATH/<name>.
+        KUBECONFIG_FILE={{ .KUBECONFIG_PATH }}/"$CLUSTER_NAME"
+
+        # ORPHAN CHECK — `kind delete` removes the cluster wholesale, so any Crossplane
+        # managed resources (VMs in vSphere/Proxmox, …) are ORPHANED, not deleted by their
+        # providers. Warn (and offer to abort) so external infra can be torn down first.
+        if [ -f "$KUBECONFIG_FILE" ]; then
+          MANAGED=$(KUBECONFIG="$KUBECONFIG_FILE" kubectl get managed 2>/dev/null | tail -n +2 || true)
+          if [ -n "$MANAGED" ]; then
+            echo "⚠️  This cluster still manages external infrastructure — it would be ORPHANED:"
+            echo "$MANAGED" | sed 's/^/    /'
+            echo "  Tear it down first, e.g.:  kubectl delete nativevspherevm <name> -n <ns>"
+            echo "  and let the provider remove the real VMs, THEN destroy the cluster."
+            gum confirm "Destroy anyway and orphan the above?" || { echo "Aborted."; exit 0; }
+          fi
+        fi
 
         if gum confirm "Do you really want to delete cluster $CLUSTER_NAME?"; then
           kind delete cluster --name "$CLUSTER_NAME"
           echo "Cluster $CLUSTER_NAME deleted."
+          # PRUNE kubeconfig — `kind delete` leaves KUBECONFIG_PATH/<name> behind, which
+          # then lingers as a stale entry in the bootstrap / deploy-* kubeconfig pickers.
+          if [ -f "$KUBECONFIG_FILE" ]; then
+            rm -f "$KUBECONFIG_FILE"
+            echo "Removed stale kubeconfig $KUBECONFIG_FILE"
+          fi
         else
           echo "Aborted."
         fi
