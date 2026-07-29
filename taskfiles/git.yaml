@@ -206,29 +206,89 @@ tasks:
         fi
 
   issue:
-    desc: Create github issue
+    desc: Create an issue (GitHub via dagger AI blueprint, GitLab via glab)
     cmds:
       - |
-        dagger call -m github.com/stuttgart-things/blueprints/repository-linting@v1.21.0 \
-        create-issue \
-        --repository $(gum input --header="REPOSITORY" --value "stuttgart-things/") \
-        --token env:GITHUB_TOKEN \
-        --content "$(gum input --header="CONTENT" --value "add issue for: ")" \
-        --model=$(gum input --header="AI MODEL" --value "gemini-2.5-flash")
+        set -euo pipefail
+
+        # Detect the forge from the origin remote; fall back to an interactive choice
+        REMOTE_URL=$(git remote get-url origin)
+        case "$REMOTE_URL" in
+          *github.com*) PLATFORM=github ;;
+          *gitlab*)     PLATFORM=gitlab ;;
+          *)            PLATFORM=$(gum choose --header "Git platform?" github gitlab) ;;
+        esac
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "📌 git:issue — ${PLATFORM}"
+
+        case "$PLATFORM" in
+          github)
+            dagger call -m github.com/stuttgart-things/blueprints/repository-linting@v1.21.0 \
+              create-issue \
+              --repository "$(gum input --header="REPOSITORY" --value "stuttgart-things/")" \
+              --token env:GITHUB_TOKEN \
+              --content "$(gum input --header="CONTENT" --value "add issue for: ")" \
+              --model="$(gum input --header="AI MODEL" --value "gemini-2.5-flash")"
+            ;;
+          gitlab)
+            TITLE=$(gum input --header "Issue title:" --placeholder "Add email to userinfo json")
+            DESC=$(gum write --header "Description (ctrl+d to finish, esc to skip):" --width 72 --height 8)
+            glab issue create --title "$TITLE" --description "$DESC"
+            ;;
+        esac
 
   branch:
-    desc: Create branch from main
+    desc: Create a convention-compliant branch from main (type + ticket + snake_case)
     cmds:
       - git checkout main
-      - git branch
-      - git pull
+      - git pull --rebase
       - |
-        echo "Enter to be created (remote) branch:"
-        read BRANCH_NAME;
-        git checkout -b ${BRANCH_NAME}
-        git push origin ${BRANCH_NAME}
-      - git branch
-      - git branch --set-upstream-to=origin/main ${BRANCH_NAME}
+        set -euo pipefail
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🌿 git:branch — new branch from main"
+
+        # 1) Branch type — every transient branch must start with its type + a slash
+        TYPE=$(gum choose --header "Branch type:" feature hotfix bugfix chore)
+
+        # 2) Ticket reference (lowercase project-number, e.g. cloud-42).
+        #    Mandatory for feature/hotfix, optional otherwise (per naming convention).
+        TICKET=$(gum input --header "Ticket reference (e.g. cloud-42; empty = none):" \
+          --placeholder "project-123" | tr '[:upper:]' '[:lower:]')
+        if [[ "$TYPE" == "feature" || "$TYPE" == "hotfix" ]]; then
+          while ! echo "$TICKET" | grep -qE '^[a-z]+-[0-9]+$'; do
+            TICKET=$(gum input --header "$TYPE requires a ticket — project-number (e.g. cloud-42):" \
+              --value "$TICKET" | tr '[:upper:]' '[:lower:]')
+          done
+        else
+          while [[ -n "$TICKET" ]] && ! echo "$TICKET" | grep -qE '^[a-z]+-[0-9]+$'; do
+            TICKET=$(gum input --header "Invalid — project-number (e.g. cloud-42), or leave empty:" \
+              --value "$TICKET" | tr '[:upper:]' '[:lower:]')
+          done
+        fi
+
+        # 3) Short description, normalized to lowercase snake_case
+        while :; do
+          DESC=$(gum input --header "Short description (will be snake_cased):" \
+            --placeholder "add email to userinfo json")
+          DESC=$(echo "$DESC" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g; s/^_+//; s/_+$//')
+          [[ -n "$DESC" ]] && break
+          gum style --foreground 214 "A description is required."
+        done
+
+        # 4) Assemble: <type>/[<ticket>_]<description>
+        if [[ -n "$TICKET" ]]; then
+          BRANCH_NAME="${TYPE}/${TICKET}_${DESC}"
+        else
+          BRANCH_NAME="${TYPE}/${DESC}"
+        fi
+
+        gum style --border normal --padding "0 1" --border-foreground 45 "$BRANCH_NAME"
+        gum confirm "Create and push this branch?" || { gum style --foreground 214 "Aborted."; exit 0; }
+
+        git checkout -b "$BRANCH_NAME"
+        git push -u origin "$BRANCH_NAME"
 
   run-pre-commit-hook:
     deps:
@@ -286,11 +346,42 @@ tasks:
         git checkout ${branch} && git pull
 
   tag:
-    desc: Tag repo
+    desc: Create a SemVer tag (bump patch/minor/major from the latest tag)
     cmds:
       - task: commit
       - |
-        echo "Enter to be created (remote) tag on the repository:"
-        read TAG_NAME;
-        git tag -a ${TAG_NAME} -m 'updated for ${TAG_NAME} on {{ .DATE }}'
-        git push origin --tags
+        set -euo pipefail
+
+        LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🏷️  git:tag — latest: ${LATEST:-none}"
+
+        # Split the latest tag into (optional v-prefix) major.minor.patch
+        PREFIX=""; BASE="${LATEST}"
+        if [[ "$LATEST" == v* ]]; then PREFIX="v"; BASE="${LATEST#v}"; fi
+        IFS=. read -r MA MI PA <<< "${BASE:-0.0.0}"
+        MA=${MA:-0}; MI=${MI:-0}; PA=${PA:-0}
+
+        BUMP=$(gum choose --header "Version bump:" \
+          "patch (${PREFIX}${MA}.${MI}.$((PA+1)))" \
+          "minor (${PREFIX}${MA}.$((MI+1)).0)" \
+          "major (${PREFIX}$((MA+1)).0.0)" \
+          "custom")
+
+        case "$BUMP" in
+          patch*) NEXT="${PREFIX}${MA}.${MI}.$((PA+1))" ;;
+          minor*) NEXT="${PREFIX}${MA}.$((MI+1)).0" ;;
+          major*) NEXT="${PREFIX}$((MA+1)).0.0" ;;
+          custom)
+            NEXT=$(gum input --header "Tag (SemVer, e.g. v1.2.3):" --value "${LATEST}")
+            while ! echo "$NEXT" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; do
+              NEXT=$(gum input --header "Invalid — must be SemVer (v1.2.3 / 1.2.3):" --value "$NEXT")
+            done
+            ;;
+        esac
+
+        gum style --border normal --padding "0 1" --border-foreground 45 "$NEXT"
+        gum confirm "Create and push tag ${NEXT}?" || { gum style --foreground 214 "Aborted."; exit 0; }
+
+        git tag -a "$NEXT" -m "Release ${NEXT} on {{ .DATE }}"
+        git push origin "$NEXT"

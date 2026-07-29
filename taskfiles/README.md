@@ -893,29 +893,71 @@ task --taskfile taskfiles/git.yaml pr
 
 </details>
 
-<details><summary><b>🌿 branch - Create New Branch from Main</b></summary>
+<details><summary><b>🌿 branch - Create a convention-compliant branch from main</b></summary>
 
-Create and push a new branch from main with proper tracking.
+Create and push a new branch from main whose name follows the Git Development/Review Flow
+naming convention: `<type>/[<ticket>_]<snake_case_description>`, all lowercase.
 
 ```bash
 task --taskfile taskfiles/git.yaml branch
 ```
 
 **Workflow:**
-1. Switches to main
-2. Shows current branches
-3. Pulls latest from main
-4. Prompts for new branch name
-5. Creates local branch
-6. Pushes to remote
-7. Sets upstream tracking to origin/main
+1. Switches to main and rebases onto latest
+2. **Type:** `gum choose` — `feature` / `hotfix` / `bugfix` / `chore`
+3. **Ticket:** lowercase `project-number` (e.g. `cloud-42`) — **mandatory for `feature`/`hotfix`**, optional otherwise; validated against `^[a-z]+-[0-9]+$`
+4. **Description:** free text, auto-normalized to lowercase `snake_case`
+5. **Confirm:** review the assembled name, then create + push with upstream tracking
 
 **Example:**
 ```bash
 task --taskfile taskfiles/git.yaml branch
-# Enter: "feat/add-dagger-docs"
-# Creates and pushes feat/add-dagger-docs
+# type: feature → ticket: cloud-42 → description: "add email to userinfo json"
+# Creates and pushes: feature/cloud-42_add_email_to_userinfo_json
 ```
+
+</details>
+
+<details><summary><b>🏷️ tag - Create a SemVer tag</b></summary>
+
+Tag the repository with a Semantic Versioning tag, bumped from the latest existing tag.
+
+```bash
+task --taskfile taskfiles/git.yaml tag
+```
+
+**Workflow:**
+1. Runs the `commit` task first
+2. Reads the latest tag (`git describe --tags`), preserving any `v` prefix
+3. **Bump:** `gum choose` — `patch` / `minor` / `major` (next version previewed) or `custom`
+4. `custom` is validated against SemVer (`v1.2.3` / `1.2.3`)
+5. **Confirm**, then `git tag -a` and push the tag
+
+**Example:**
+```bash
+task --taskfile taskfiles/git.yaml tag
+# latest: v1.2.9 → select "minor" → creates and pushes v1.3.0
+```
+
+</details>
+
+<details><summary><b>📌 issue - Create an issue (GitHub or GitLab)</b></summary>
+
+Create an issue on the detected forge. GitHub uses the `repository-linting` dagger blueprint
+(AI-assisted issue content); GitLab uses `glab issue create`.
+
+```bash
+task --taskfile taskfiles/git.yaml issue
+```
+
+**Workflow:**
+1. Detects the forge from `git remote get-url origin` (`github` / `gitlab`), or asks if ambiguous
+2. **GitHub:** prompts for repository, content and AI model → `dagger call … create-issue`
+3. **GitLab:** prompts for title and description → `glab issue create`
+
+**Requirements:**
+- GitHub path: `GITHUB_TOKEN` env var + `dagger`
+- GitLab path: `glab` installed and authenticated
 
 </details>
 
