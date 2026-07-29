@@ -802,7 +802,7 @@ Interactive taskfile for Git workflow automation with conventional commits and p
 
 <details><summary><b>💾 commit - Commit & Push Changes</b></summary>
 
-Interactive commit workflow with conventional commit support and change review.
+Interactive commit workflow with per-file staging and a convention-compliant commit message.
 
 ```bash
 task --taskfile taskfiles/git.yaml commit
@@ -811,38 +811,39 @@ task --taskfile taskfiles/git.yaml commit
 **Features:**
 - Pre-commit hook execution
 - Git status review before commit
-- Conventional commit message templates
-- Custom commit messages with file context
-- Automatic push to origin
+- **Interactive per-file staging** (`gum choose --no-limit`) — only the files you pick are committed, never a blanket `git add *`
+- **Convention-compliant subject:** `[<type>: ]<TICKET-REF>: <Summary>`, with validation
+- Optional extended body (blank-line separated)
+- Rebase-based sync + push (keeps history linear)
 
 **Workflow:**
 1. **Pre-commit Checks:** Runs `pre-commit` hooks (formatting, linting, etc.)
-2. **Set Upstream:** Links branch to remote
-3. **Pull Latest:** Syncs with remote branch
-4. **Review Changes:** Shows `git status`
-5. **Confirm Commit:** Review changes, confirm or cancel
-6. **Commit Message:**
-   - `CUSTOM MESSAGE` - Enter your own message (shows changed files)
-   - `feat: <branch-name>` - New feature
-   - `fix: <branch-name>` - Bug fix
-   - `BREAKING CHANGE: <branch-name>` - Breaking change
-7. **Push:** Automatic push to origin
+2. **Review Changes:** Shows `git status --short`; exits early if the tree is clean
+3. **Select Files:** Pick exactly which changed files to stage (space to toggle, enter to confirm)
+4. **Compose Message:**
+   - **Type:** Conventional Commits type via `gum choose` (`feat`, `fix`, `docs`, … or `none`)
+   - **Ticket:** Auto-parsed from the branch (e.g. `feature/cloud-42_…` → `CLOUD-42`), validated as `PROJECT-NUMBER`, forced UPPERCASE
+   - **Summary:** Must start with a capital letter; full subject line is capped at **72 characters**
+   - **Body (optional):** Multi-line via `gum write`, separated from the subject by a blank line
+5. **Confirm:** Review the assembled message, then confirm or abort (staged files are kept on abort)
+6. **Sync & Push:** `git pull --rebase --autostash` (if an upstream exists), then `git push -u origin <branch>`
 
-**Examples:**
+Resulting subject examples (per the Git Development/Review Flow naming convention):
+
+```text
+CLOUD-42: Add missing LICENSE information to pyproject.toml
+fix: CLOUD-42: Correct YAML formatting in flux module
+```
+
+**Example:**
 
 ```bash
-# Feature branch workflow
-git checkout -b feat/add-flux-secrets
+git checkout -b feature/cloud-42_add_flux_secrets
 # ... make changes ...
 task --taskfile taskfiles/git.yaml commit
-# Select: "feat: feat/add-flux-secrets"
-
-# Bug fix with custom message
-git checkout -b fix/yaml-output
-# ... make changes ...
-task --taskfile taskfiles/git.yaml commit
-# Select: "CUSTOM MESSAGE"
-# Enter: "fix(kcl): correct YAML formatting in flux module"
+# Select the files to stage →
+#   type: fix → ticket: CLOUD-42 → summary: "Correct YAML formatting in flux module"
+# Produces: "fix: CLOUD-42: Correct YAML formatting in flux module"
 ```
 
 </details>

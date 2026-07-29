@@ -44,33 +44,115 @@ tasks:
         cat {{ .EXPORT_PATH }}
 
   commit:
-    desc: Commit + push code into branch
+    desc: Interactively stage selected files & commit with a convention-compliant message
     deps:
       - check
+    vars:
+      # Parse a ticket reference (e.g. feature/cloud-42_... -> CLOUD-42) from the branch name
+      TICKET:
+        sh: git rev-parse --abbrev-ref HEAD | grep -oiE '[a-z]+-[0-9]+' | head -n1 | tr '[:lower:]' '[:upper:]' || true
     cmds:
-      - git branch --set-upstream-to=origin/{{ .BRANCH }}
-      - git pull
-      - git status
       - |
-        git add *
-        git status
-        if [[ -n $(git status --porcelain) ]]; then
-          echo "Review the changes above."
-          gum confirm "Do you want to commit these changes?" || exit 0
+        set -euo pipefail
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-          echo "ENTER COMMIT MESSAGE"
-          COMMIT_MESSAGE=$(gum choose "CUSTOM MESSAGE" "feat: {{ .BRANCH }}" "fix: {{ .BRANCH }}" "BREAKING CHANGE: {{ .BRANCH }}")
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "💾 git:commit — ${CURRENT_BRANCH}"
 
-          if [ "$COMMIT_MESSAGE" == "CUSTOM MESSAGE" ]; then
-            CHANGED_FILES=$(git status --short | awk '{print $2}' | tr '\n' ' ')
-            COMMIT_MESSAGE=$(gum input --placeholder "Commit message" --value "Changed: $CHANGED_FILES")
-          fi
-
-          git commit --allow-empty -a -m "$COMMIT_MESSAGE"
-        else
-          echo "No changes to commit."
+        # 1) Bail out early if there is nothing to commit
+        if [[ -z "$(git status --porcelain)" ]]; then
+          gum style --foreground 214 "No changes to commit."
+          exit 0
         fi
-      - git push origin -u {{ .BRANCH }}
+
+        # 2) Show the current status for review
+        echo "Current working tree:"
+        git -c color.status=always status --short
+
+        # 3) Interactively select which files should land in the commit (NOT all by default)
+        SELECTED=$(git -c core.quotepath=false status --porcelain \
+          | gum choose --no-limit --height 20 \
+              --header "Select files to stage (space=toggle, ctrl+a=all, enter=confirm):")
+
+        if [[ -z "$SELECTED" ]]; then
+          gum style --foreground 214 "No files selected — aborting."
+          exit 0
+        fi
+
+        # Stage only the selected files (strip the 2-char status + space prefix; handle renames)
+        while IFS= read -r line; do
+          [[ -z "$line" ]] && continue
+          path="${line:3}"
+          case "$path" in *" -> "*) path="${path##* -> }";; esac
+          git add -- "$path"
+        done <<< "$SELECTED"
+
+        echo "Staged for commit:"
+        git -c color.status=always status --short
+
+        # 4) Build a convention-compliant subject: [<type>: ]<TICKET-REF>: <Summary>
+        TYPE=$(gum choose --header "Conventional Commits type (select 'none' to omit):" \
+          none feat fix docs refactor test chore build ci perf "feat!")
+
+        # Ticket reference: UPPERCASE, PROJECT-NUMBER, validated in a loop
+        TICKET=$(gum input --header "Ticket reference (UPPERCASE, e.g. CLOUD-42):" \
+          --value "{{ .TICKET }}" --placeholder "PROJECT-123" | tr '[:lower:]' '[:upper:]')
+        while ! echo "$TICKET" | grep -qE '^[A-Z]+-[0-9]+$'; do
+          TICKET=$(gum input --header "Invalid — must be PROJECT-NUMBER (e.g. CLOUD-42):" \
+            --value "$TICKET" | tr '[:lower:]' '[:upper:]')
+        done
+
+        # Summary: must start with a capital letter; full subject line must be <= 72 chars
+        while :; do
+          SUMMARY=$(gum input --header "Summary (present-tense verb, Capitalized):" \
+            --placeholder "Add missing LICENSE to pyproject.toml")
+          if [[ -z "$SUMMARY" ]]; then
+            gum style --foreground 214 "Summary is required."
+            continue
+          fi
+          if [[ "$TYPE" == "none" ]]; then
+            SUBJECT="${TICKET}: ${SUMMARY}"
+          else
+            SUBJECT="${TYPE}: ${TICKET}: ${SUMMARY}"
+          fi
+          FIRST_CHAR="${SUMMARY:0:1}"
+          if [[ "$FIRST_CHAR" != "$(echo "$FIRST_CHAR" | tr '[:lower:]' '[:upper:]')" ]]; then
+            gum style --foreground 214 "Summary must start with a capital letter."
+            continue
+          fi
+          if (( ${#SUBJECT} > 72 )); then
+            gum style --foreground 214 "Subject too long (${#SUBJECT}/72) — please shorten."
+            continue
+          fi
+          break
+        done
+
+        # 5) Optional extended body (separated from the subject by a blank line)
+        if gum confirm "Add an extended description (body)?"; then
+          BODY=$(gum write --header "Body (ctrl+d to finish, esc to skip):" --width 72 --height 10)
+        else
+          BODY=""
+        fi
+
+        if [[ -n "$BODY" ]]; then
+          MESSAGE=$(printf '%s\n\n%s\n' "$SUBJECT" "$BODY")
+        else
+          MESSAGE="$SUBJECT"
+        fi
+
+        # 6) Review the final message and confirm
+        gum style --border normal --padding "1 2" --border-foreground 45 "$MESSAGE"
+        if ! gum confirm "Commit with this message?"; then
+          gum style --foreground 214 "Aborted (staged files kept)."
+          exit 0
+        fi
+        git commit -m "$MESSAGE"
+
+        # 7) Sync with remote (rebase to keep history linear per ff-only policy) & push
+        if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+          git pull --rebase --autostash
+        fi
+        git push -u origin "$CURRENT_BRANCH"
 
   pr:
     desc: Create pull request into main
