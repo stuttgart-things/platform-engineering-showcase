@@ -802,7 +802,7 @@ Interactive taskfile for Git workflow automation with conventional commits and p
 
 <details><summary><b>💾 commit - Commit & Push Changes</b></summary>
 
-Interactive commit workflow with conventional commit support and change review.
+Interactive commit workflow with per-file staging and a convention-compliant commit message.
 
 ```bash
 task --taskfile taskfiles/git.yaml commit
@@ -811,45 +811,47 @@ task --taskfile taskfiles/git.yaml commit
 **Features:**
 - Pre-commit hook execution
 - Git status review before commit
-- Conventional commit message templates
-- Custom commit messages with file context
-- Automatic push to origin
+- **Interactive per-file staging** (`gum choose --no-limit`) — only the files you pick are committed, never a blanket `git add *`
+- **Convention-compliant subject:** `[<type>: ]<TICKET-REF>: <Summary>`, with validation
+- Optional extended body (blank-line separated)
+- Rebase-based sync + push (keeps history linear)
 
 **Workflow:**
 1. **Pre-commit Checks:** Runs `pre-commit` hooks (formatting, linting, etc.)
-2. **Set Upstream:** Links branch to remote
-3. **Pull Latest:** Syncs with remote branch
-4. **Review Changes:** Shows `git status`
-5. **Confirm Commit:** Review changes, confirm or cancel
-6. **Commit Message:**
-   - `CUSTOM MESSAGE` - Enter your own message (shows changed files)
-   - `feat: <branch-name>` - New feature
-   - `fix: <branch-name>` - Bug fix
-   - `BREAKING CHANGE: <branch-name>` - Breaking change
-7. **Push:** Automatic push to origin
+2. **Review Changes:** Shows `git status --short`; exits early if the tree is clean
+3. **Select Files:** Pick exactly which changed files to stage (space to toggle, enter to confirm)
+4. **Compose Message:**
+   - **Type:** Conventional Commits type via `gum choose` (`feat`, `fix`, `docs`, … or `none`)
+   - **Ticket (optional):** Auto-parsed from the branch (e.g. `feature/cloud-42_…` → `CLOUD-42`); when set it is validated as `PROJECT-NUMBER` and forced UPPERCASE. Leave empty to omit the ticket reference entirely.
+   - **Summary:** Must start with a capital letter; full subject line is capped at **72 characters**
+   - **Body (optional):** Multi-line via `gum write`, separated from the subject by a blank line
+5. **Confirm:** Review the assembled message, then confirm or abort (staged files are kept on abort)
+6. **Sync & Push:** `git pull --rebase --autostash` (if an upstream exists), then `git push -u origin <branch>`
 
-**Examples:**
+Resulting subject examples (per the Git Development/Review Flow naming convention):
+
+```text
+CLOUD-42: Add missing LICENSE information to pyproject.toml
+fix: CLOUD-42: Correct YAML formatting in flux module
+```
+
+**Example:**
 
 ```bash
-# Feature branch workflow
-git checkout -b feat/add-flux-secrets
+git checkout -b feature/cloud-42_add_flux_secrets
 # ... make changes ...
 task --taskfile taskfiles/git.yaml commit
-# Select: "feat: feat/add-flux-secrets"
-
-# Bug fix with custom message
-git checkout -b fix/yaml-output
-# ... make changes ...
-task --taskfile taskfiles/git.yaml commit
-# Select: "CUSTOM MESSAGE"
-# Enter: "fix(kcl): correct YAML formatting in flux module"
+# Select the files to stage →
+#   type: fix → ticket: CLOUD-42 → summary: "Correct YAML formatting in flux module"
+# Produces: "fix: CLOUD-42: Correct YAML formatting in flux module"
 ```
 
 </details>
 
-<details><summary><b>🔀 pr - Create and Merge Pull Request</b></summary>
+<details><summary><b>🔀 pr - Create a Pull / Merge Request into main</b></summary>
 
-Automate pull request creation, checks, and merge into main.
+Create a pull request (GitHub) or merge request (GitLab) into main. The forge is
+auto-detected from the `origin` remote, so the same task works on both platforms.
 
 ```bash
 task --taskfile taskfiles/git.yaml pr
@@ -857,57 +859,105 @@ task --taskfile taskfiles/git.yaml pr
 
 **Features:**
 - Commits changes first (runs `commit` task)
-- Creates PR via GitHub CLI
-- Auto-merge with rebase strategy
-- Auto-delete source branch after merge
-- Switches back to main and pulls latest
+- **Platform-agnostic:** GitHub via `gh`, GitLab via `glab` — auto-detected from the remote URL
+- **Draft = private/WIP** per the review flow; non-draft is public and queued for auto-merge
+- **Squash** merge strategy (per the "ENFORCE Squash" policy)
+- Auto-delete / remove source branch after merge
+- Switches back to main and pulls latest (only for non-draft requests)
 
 **Workflow:**
-1. **Commit:** Runs commit task
-2. **Create PR:** `gh pr create -t "<branch>" -b "<branch> branch into main"`
-3. **Wait:** 2s delay for PR creation
-4. **Auto-merge:** Enables auto-merge with rebase
-5. **Cleanup:** Deletes branch after merge
-6. **Switch to main:** Checks out main and pulls latest
+1. **Commit:** Runs the `commit` task
+2. **Detect platform:** Reads `git remote get-url origin` (`github` / `gitlab`), or asks if ambiguous
+3. **Title & description:** Prompted via `gum input` / `gum write`
+4. **Draft?:** `gum confirm` — Draft keeps the request private and skips auto-merge
+5. **Create request:**
+   - GitHub: `gh pr create --base main --head <branch> …`
+   - GitLab: `glab mr create --target-branch main --source-branch <branch> … --squash-before-merge`
+6. **Auto-merge (non-draft only):**
+   - GitHub: `gh pr merge --auto --squash --delete-branch`
+   - GitLab: `glab mr merge --squash --remove-source-branch --when-pipeline-succeeds`
+7. **Switch to main:** Only when the request was queued for merge (non-draft)
 
 **Requirements:**
-- GitHub CLI (`gh`) installed and authenticated
-- Branch protection rules configured (optional)
-- CI checks configured for auto-merge
+- GitHub CLI (`gh`) **or** GitLab CLI (`glab`) installed and authenticated
+- Branch protection / CI checks configured for auto-merge
 
 **Example:**
 ```bash
-git checkout -b feat/new-taskfile
+git checkout -b feature/cloud-42_new_taskfile
 # ... make changes ...
 task --taskfile taskfiles/git.yaml pr
-# Creates PR, waits for checks, auto-merges, switches to main
+# Detects the forge, prompts for title/description, asks Draft?,
+# then creates the PR/MR and (if non-draft) queues a squash auto-merge.
 ```
 
 </details>
 
-<details><summary><b>🌿 branch - Create New Branch from Main</b></summary>
+<details><summary><b>🌿 branch - Create a convention-compliant branch from main</b></summary>
 
-Create and push a new branch from main with proper tracking.
+Create and push a new branch from main whose name follows the Git Development/Review Flow
+naming convention: `<type>/[<ticket>_]<snake_case_description>`, all lowercase.
 
 ```bash
 task --taskfile taskfiles/git.yaml branch
 ```
 
 **Workflow:**
-1. Switches to main
-2. Shows current branches
-3. Pulls latest from main
-4. Prompts for new branch name
-5. Creates local branch
-6. Pushes to remote
-7. Sets upstream tracking to origin/main
+1. Switches to main and rebases onto latest
+2. **Type:** `gum choose` — `feature` / `hotfix` / `bugfix` / `chore`
+3. **Ticket:** lowercase `project-number` (e.g. `cloud-42`) — **mandatory for `feature`/`hotfix`**, optional otherwise; validated against `^[a-z]+-[0-9]+$`
+4. **Description:** free text, auto-normalized to lowercase `snake_case`
+5. **Confirm:** review the assembled name, then create + push with upstream tracking
 
 **Example:**
 ```bash
 task --taskfile taskfiles/git.yaml branch
-# Enter: "feat/add-dagger-docs"
-# Creates and pushes feat/add-dagger-docs
+# type: feature → ticket: cloud-42 → description: "add email to userinfo json"
+# Creates and pushes: feature/cloud-42_add_email_to_userinfo_json
 ```
+
+</details>
+
+<details><summary><b>🏷️ tag - Create a SemVer tag</b></summary>
+
+Tag the repository with a Semantic Versioning tag, bumped from the latest existing tag.
+
+```bash
+task --taskfile taskfiles/git.yaml tag
+```
+
+**Workflow:**
+1. Runs the `commit` task first
+2. Reads the latest tag (`git describe --tags`), preserving any `v` prefix
+3. **Bump:** `gum choose` — `patch` / `minor` / `major` (next version previewed) or `custom`
+4. `custom` is validated against SemVer (`v1.2.3` / `1.2.3`)
+5. **Confirm**, then `git tag -a` and push the tag
+
+**Example:**
+```bash
+task --taskfile taskfiles/git.yaml tag
+# latest: v1.2.9 → select "minor" → creates and pushes v1.3.0
+```
+
+</details>
+
+<details><summary><b>📌 issue - Create an issue (GitHub or GitLab)</b></summary>
+
+Create an issue on the detected forge. GitHub uses the `repository-linting` dagger blueprint
+(AI-assisted issue content); GitLab uses `glab issue create`.
+
+```bash
+task --taskfile taskfiles/git.yaml issue
+```
+
+**Workflow:**
+1. Detects the forge from `git remote get-url origin` (`github` / `gitlab`), or asks if ambiguous
+2. **GitHub:** prompts for repository, content and AI model → `dagger call … create-issue`
+3. **GitLab:** prompts for title and description → `glab issue create`
+
+**Requirements:**
+- GitHub path: `GITHUB_TOKEN` env var + `dagger`
+- GitLab path: `glab` installed and authenticated
 
 </details>
 

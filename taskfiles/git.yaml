@@ -44,68 +44,252 @@ tasks:
         cat {{ .EXPORT_PATH }}
 
   commit:
-    desc: Commit + push code into branch
+    desc: Interactively stage selected files & commit with a convention-compliant message
     deps:
       - check
+    vars:
+      # Parse a ticket reference (e.g. feature/cloud-42_... -> CLOUD-42) from the branch name
+      TICKET:
+        sh: git rev-parse --abbrev-ref HEAD | grep -oiE '[a-z]+-[0-9]+' | head -n1 | tr '[:lower:]' '[:upper:]' || true
     cmds:
-      - git branch --set-upstream-to=origin/{{ .BRANCH }}
-      - git pull
-      - git status
       - |
-        git add *
-        git status
-        if [[ -n $(git status --porcelain) ]]; then
-          echo "Review the changes above."
-          gum confirm "Do you want to commit these changes?" || exit 0
+        set -euo pipefail
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-          echo "ENTER COMMIT MESSAGE"
-          COMMIT_MESSAGE=$(gum choose "CUSTOM MESSAGE" "feat: {{ .BRANCH }}" "fix: {{ .BRANCH }}" "BREAKING CHANGE: {{ .BRANCH }}")
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "💾 git:commit — ${CURRENT_BRANCH}"
 
-          if [ "$COMMIT_MESSAGE" == "CUSTOM MESSAGE" ]; then
-            CHANGED_FILES=$(git status --short | awk '{print $2}' | tr '\n' ' ')
-            COMMIT_MESSAGE=$(gum input --placeholder "Commit message" --value "Changed: $CHANGED_FILES")
-          fi
-
-          git commit --allow-empty -a -m "$COMMIT_MESSAGE"
-        else
-          echo "No changes to commit."
+        # 1) Bail out early if there is nothing to commit
+        if [[ -z "$(git status --porcelain)" ]]; then
+          gum style --foreground 214 "No changes to commit."
+          exit 0
         fi
-      - git push origin -u {{ .BRANCH }}
+
+        # 2) Show the current status for review
+        echo "Current working tree:"
+        git -c color.status=always status --short
+
+        # 3) Interactively select which files should land in the commit (NOT all by default)
+        SELECTED=$(git -c core.quotepath=false status --porcelain \
+          | gum choose --no-limit --height 20 \
+              --header "Select files to stage (space=toggle, ctrl+a=all, enter=confirm):")
+
+        if [[ -z "$SELECTED" ]]; then
+          gum style --foreground 214 "No files selected — aborting."
+          exit 0
+        fi
+
+        # Stage only the selected files (strip the 2-char status + space prefix; handle renames)
+        while IFS= read -r line; do
+          [[ -z "$line" ]] && continue
+          path="${line:3}"
+          case "$path" in *" -> "*) path="${path##* -> }";; esac
+          git add -- "$path"
+        done <<< "$SELECTED"
+
+        echo "Staged for commit:"
+        git -c color.status=always status --short
+
+        # 4) Build a convention-compliant subject: [<type>: ]<TICKET-REF>: <Summary>
+        TYPE=$(gum choose --header "Conventional Commits type (select 'none' to omit):" \
+          none feat fix docs refactor test chore build ci perf "feat!")
+
+        # Ticket reference: optional. If given it must be UPPERCASE PROJECT-NUMBER (validated in a loop).
+        TICKET=$(gum input --header "Ticket reference (e.g. CLOUD-42; leave empty for none):" \
+          --value "{{ .TICKET }}" --placeholder "PROJECT-123 (optional)" | tr '[:lower:]' '[:upper:]')
+        while [[ -n "$TICKET" ]] && ! echo "$TICKET" | grep -qE '^[A-Z]+-[0-9]+$'; do
+          TICKET=$(gum input --header "Invalid — PROJECT-NUMBER (e.g. CLOUD-42), or leave empty:" \
+            --value "$TICKET" | tr '[:lower:]' '[:upper:]')
+        done
+
+        # Summary: must start with a capital letter; full subject line must be <= 72 chars
+        while :; do
+          SUMMARY=$(gum input --header "Summary (present-tense verb, Capitalized):" \
+            --placeholder "Add missing LICENSE to pyproject.toml")
+          if [[ -z "$SUMMARY" ]]; then
+            gum style --foreground 214 "Summary is required."
+            continue
+          fi
+          # Assemble [<type>: ][<TICKET>: ]<Summary> — each prefix part is optional
+          PREFIX=""
+          [[ "$TYPE" != "none" ]] && PREFIX="${TYPE}: "
+          [[ -n "$TICKET" ]] && PREFIX="${PREFIX}${TICKET}: "
+          SUBJECT="${PREFIX}${SUMMARY}"
+          FIRST_CHAR="${SUMMARY:0:1}"
+          if [[ "$FIRST_CHAR" != "$(echo "$FIRST_CHAR" | tr '[:lower:]' '[:upper:]')" ]]; then
+            gum style --foreground 214 "Summary must start with a capital letter."
+            continue
+          fi
+          if (( ${#SUBJECT} > 72 )); then
+            gum style --foreground 214 "Subject too long (${#SUBJECT}/72) — please shorten."
+            continue
+          fi
+          break
+        done
+
+        # 5) Optional extended body (separated from the subject by a blank line)
+        if gum confirm "Add an extended description (body)?"; then
+          BODY=$(gum write --header "Body (ctrl+d to finish, esc to skip):" --width 72 --height 10)
+        else
+          BODY=""
+        fi
+
+        if [[ -n "$BODY" ]]; then
+          MESSAGE=$(printf '%s\n\n%s\n' "$SUBJECT" "$BODY")
+        else
+          MESSAGE="$SUBJECT"
+        fi
+
+        # 6) Review the final message and confirm
+        gum style --border normal --padding "1 2" --border-foreground 45 "$MESSAGE"
+        if ! gum confirm "Commit with this message?"; then
+          gum style --foreground 214 "Aborted (staged files kept)."
+          exit 0
+        fi
+        git commit -m "$MESSAGE"
+
+        # 7) Sync with remote (rebase to keep history linear per ff-only policy) & push
+        if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+          gum spin --title "Rebasing onto upstream…" --show-error -- git pull --rebase --autostash
+        fi
+        gum spin --title "Pushing to origin…" --show-error -- git push -u origin "$CURRENT_BRANCH"
 
   pr:
-    desc: Create pull request into main
+    desc: Create a pull/merge request into main (GitHub via gh, GitLab via glab)
     cmds:
       - task: commit
-      - gh pr create -t "{{ .BRANCH }}" -b "{{ .BRANCH }} branch into main"
-      - sleep 2s
-      # - gh pr checks $(gh pr list | grep "^[^#;]" | awk '{print $1}') --watch
-      - gh pr merge $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --auto --rebase --delete-branch
-      - git checkout main && git pull
+      - |
+        set -euo pipefail
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+        # Detect the forge from the origin remote; fall back to an interactive choice
+        REMOTE_URL=$(git remote get-url origin)
+        case "$REMOTE_URL" in
+          *github.com*) PLATFORM=github ;;
+          *gitlab*)     PLATFORM=gitlab ;;
+          *)            PLATFORM=$(gum choose --header "Git platform?" github gitlab) ;;
+        esac
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🔀 git:pr — ${BRANCH} → main (${PLATFORM})"
+
+        TITLE=$(gum input --header "PR/MR title:" --value "$BRANCH")
+        BODY=$(gum write --header "Description (ctrl+d to finish, esc to skip):" --width 72 --height 8)
+
+        # Draft = private/WIP per the review flow; a non-draft request is public and auto-merges (squash)
+        DRAFT=""
+        if gum confirm "Create as Draft (private / WIP — no auto-merge)?"; then
+          DRAFT=1
+        fi
+
+        case "$PLATFORM" in
+          github)
+            gh pr create --base main --head "$BRANCH" \
+              --title "$TITLE" --body "$BODY" ${DRAFT:+--draft}
+            if [[ -z "$DRAFT" ]]; then
+              gh pr merge --auto --squash --delete-branch
+            fi
+            ;;
+          gitlab)
+            glab mr create --target-branch main --source-branch "$BRANCH" \
+              --title "$TITLE" --description "$BODY" --remove-source-branch --squash-before-merge \
+              ${DRAFT:+--draft} --yes
+            if [[ -z "$DRAFT" ]]; then
+              glab mr merge --squash --remove-source-branch --when-pipeline-succeeds --yes
+            fi
+            ;;
+        esac
+
+        # Only return to main when the request was actually queued for merge (non-draft)
+        if [[ -z "$DRAFT" ]]; then
+          git checkout main
+          gum spin --title "Pulling main…" --show-error -- git pull --rebase
+        fi
 
   issue:
-    desc: Create github issue
+    desc: Create an issue (GitHub via dagger AI blueprint, GitLab via glab)
     cmds:
       - |
-        dagger call -m github.com/stuttgart-things/blueprints/repository-linting@v1.21.0 \
-        create-issue \
-        --repository $(gum input --header="REPOSITORY" --value "stuttgart-things/") \
-        --token env:GITHUB_TOKEN \
-        --content "$(gum input --header="CONTENT" --value "add issue for: ")" \
-        --model=$(gum input --header="AI MODEL" --value "gemini-2.5-flash")
+        set -euo pipefail
+
+        # Detect the forge from the origin remote; fall back to an interactive choice
+        REMOTE_URL=$(git remote get-url origin)
+        case "$REMOTE_URL" in
+          *github.com*) PLATFORM=github ;;
+          *gitlab*)     PLATFORM=gitlab ;;
+          *)            PLATFORM=$(gum choose --header "Git platform?" github gitlab) ;;
+        esac
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "📌 git:issue — ${PLATFORM}"
+
+        case "$PLATFORM" in
+          github)
+            dagger call -m github.com/stuttgart-things/blueprints/repository-linting@v1.21.0 \
+              create-issue \
+              --repository "$(gum input --header="REPOSITORY" --value "stuttgart-things/")" \
+              --token env:GITHUB_TOKEN \
+              --content "$(gum input --header="CONTENT" --value "add issue for: ")" \
+              --model="$(gum input --header="AI MODEL" --value "gemini-2.5-flash")"
+            ;;
+          gitlab)
+            TITLE=$(gum input --header "Issue title:" --placeholder "Add email to userinfo json")
+            DESC=$(gum write --header "Description (ctrl+d to finish, esc to skip):" --width 72 --height 8)
+            glab issue create --title "$TITLE" --description "$DESC"
+            ;;
+        esac
 
   branch:
-    desc: Create branch from main
+    desc: Create a convention-compliant branch from main (type + ticket + snake_case)
     cmds:
       - git checkout main
-      - git branch
-      - git pull
+      - gum spin --title "Pulling main…" --show-error -- git pull --rebase
       - |
-        echo "Enter to be created (remote) branch:"
-        read BRANCH_NAME;
-        git checkout -b ${BRANCH_NAME}
-        git push origin ${BRANCH_NAME}
-      - git branch
-      - git branch --set-upstream-to=origin/main ${BRANCH_NAME}
+        set -euo pipefail
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🌿 git:branch — new branch from main"
+
+        # 1) Branch type — every transient branch must start with its type + a slash
+        TYPE=$(gum choose --header "Branch type:" feature hotfix bugfix chore)
+
+        # 2) Ticket reference (lowercase project-number, e.g. cloud-42).
+        #    Mandatory for feature/hotfix, optional otherwise (per naming convention).
+        TICKET=$(gum input --header "Ticket reference (e.g. cloud-42; empty = none):" \
+          --placeholder "project-123" | tr '[:upper:]' '[:lower:]')
+        if [[ "$TYPE" == "feature" || "$TYPE" == "hotfix" ]]; then
+          while ! echo "$TICKET" | grep -qE '^[a-z]+-[0-9]+$'; do
+            TICKET=$(gum input --header "$TYPE requires a ticket — project-number (e.g. cloud-42):" \
+              --value "$TICKET" | tr '[:upper:]' '[:lower:]')
+          done
+        else
+          while [[ -n "$TICKET" ]] && ! echo "$TICKET" | grep -qE '^[a-z]+-[0-9]+$'; do
+            TICKET=$(gum input --header "Invalid — project-number (e.g. cloud-42), or leave empty:" \
+              --value "$TICKET" | tr '[:upper:]' '[:lower:]')
+          done
+        fi
+
+        # 3) Short description, normalized to lowercase snake_case
+        while :; do
+          DESC=$(gum input --header "Short description (will be snake_cased):" \
+            --placeholder "add email to userinfo json")
+          DESC=$(echo "$DESC" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g; s/^_+//; s/_+$//')
+          [[ -n "$DESC" ]] && break
+          gum style --foreground 214 "A description is required."
+        done
+
+        # 4) Assemble: <type>/[<ticket>_]<description>
+        if [[ -n "$TICKET" ]]; then
+          BRANCH_NAME="${TYPE}/${TICKET}_${DESC}"
+        else
+          BRANCH_NAME="${TYPE}/${DESC}"
+        fi
+
+        gum style --border normal --padding "0 1" --border-foreground 45 "$BRANCH_NAME"
+        gum confirm "Create and push this branch?" || { gum style --foreground 214 "Aborted."; exit 0; }
+
+        git checkout -b "$BRANCH_NAME"
+        gum spin --title "Pushing new branch…" --show-error -- git push -u origin "$BRANCH_NAME"
 
   run-pre-commit-hook:
     deps:
@@ -148,7 +332,7 @@ tasks:
     desc: Switch to remote branch
     cmds:
       - |
-        git fetch
+        gum spin --title "Fetching…" --show-error -- git fetch
         branches=($(git branch -r | grep -v 'origin/HEAD' | sed 's|origin/||'))
         branch=$(printf "%s\n" "${branches[@]}" | gum choose)
         git switch -c ${branch} --track origin/${branch}
@@ -160,14 +344,46 @@ tasks:
       - |
         branches=$(git branch -a | grep -v 'remotes')
         branch=$(printf "%s\n" "${branches[@]}" | gum choose)
-        git checkout ${branch} && git pull
+        git checkout ${branch}
+        gum spin --title "Pulling…" --show-error -- git pull
 
   tag:
-    desc: Tag repo
+    desc: Create a SemVer tag (bump patch/minor/major from the latest tag)
     cmds:
       - task: commit
       - |
-        echo "Enter to be created (remote) tag on the repository:"
-        read TAG_NAME;
-        git tag -a ${TAG_NAME} -m 'updated for ${TAG_NAME} on {{ .DATE }}'
-        git push origin --tags
+        set -euo pipefail
+
+        LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🏷️  git:tag — latest: ${LATEST:-none}"
+
+        # Split the latest tag into (optional v-prefix) major.minor.patch
+        PREFIX=""; BASE="${LATEST}"
+        if [[ "$LATEST" == v* ]]; then PREFIX="v"; BASE="${LATEST#v}"; fi
+        IFS=. read -r MA MI PA <<< "${BASE:-0.0.0}"
+        MA=${MA:-0}; MI=${MI:-0}; PA=${PA:-0}
+
+        BUMP=$(gum choose --header "Version bump:" \
+          "patch (${PREFIX}${MA}.${MI}.$((PA+1)))" \
+          "minor (${PREFIX}${MA}.$((MI+1)).0)" \
+          "major (${PREFIX}$((MA+1)).0.0)" \
+          "custom")
+
+        case "$BUMP" in
+          patch*) NEXT="${PREFIX}${MA}.${MI}.$((PA+1))" ;;
+          minor*) NEXT="${PREFIX}${MA}.$((MI+1)).0" ;;
+          major*) NEXT="${PREFIX}$((MA+1)).0.0" ;;
+          custom)
+            NEXT=$(gum input --header "Tag (SemVer, e.g. v1.2.3):" --value "${LATEST}")
+            while ! echo "$NEXT" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; do
+              NEXT=$(gum input --header "Invalid — must be SemVer (v1.2.3 / 1.2.3):" --value "$NEXT")
+            done
+            ;;
+        esac
+
+        gum style --border normal --padding "0 1" --border-foreground 45 "$NEXT"
+        gum confirm "Create and push tag ${NEXT}?" || { gum style --foreground 214 "Aborted."; exit 0; }
+
+        git tag -a "$NEXT" -m "Release ${NEXT} on {{ .DATE }}"
+        gum spin --title "Pushing tag ${NEXT}…" --show-error -- git push origin "$NEXT"
