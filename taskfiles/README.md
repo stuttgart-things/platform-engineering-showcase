@@ -822,7 +822,7 @@ task --taskfile taskfiles/git.yaml commit
 3. **Select Files:** Pick exactly which changed files to stage (space to toggle, enter to confirm)
 4. **Compose Message:**
    - **Type:** Conventional Commits type via `gum choose` (`feat`, `fix`, `docs`, … or `none`)
-   - **Ticket:** Auto-parsed from the branch (e.g. `feature/cloud-42_…` → `CLOUD-42`), validated as `PROJECT-NUMBER`, forced UPPERCASE
+   - **Ticket (optional):** Auto-parsed from the branch (e.g. `feature/cloud-42_…` → `CLOUD-42`); when set it is validated as `PROJECT-NUMBER` and forced UPPERCASE. Leave empty to omit the ticket reference entirely.
    - **Summary:** Must start with a capital letter; full subject line is capped at **72 characters**
    - **Body (optional):** Multi-line via `gum write`, separated from the subject by a blank line
 5. **Confirm:** Review the assembled message, then confirm or abort (staged files are kept on abort)
@@ -848,9 +848,10 @@ task --taskfile taskfiles/git.yaml commit
 
 </details>
 
-<details><summary><b>🔀 pr - Create and Merge Pull Request</b></summary>
+<details><summary><b>🔀 pr - Create a Pull / Merge Request into main</b></summary>
 
-Automate pull request creation, checks, and merge into main.
+Create a pull request (GitHub) or merge request (GitLab) into main. The forge is
+auto-detected from the `origin` remote, so the same task works on both platforms.
 
 ```bash
 task --taskfile taskfiles/git.yaml pr
@@ -858,30 +859,36 @@ task --taskfile taskfiles/git.yaml pr
 
 **Features:**
 - Commits changes first (runs `commit` task)
-- Creates PR via GitHub CLI
-- Auto-merge with rebase strategy
-- Auto-delete source branch after merge
-- Switches back to main and pulls latest
+- **Platform-agnostic:** GitHub via `gh`, GitLab via `glab` — auto-detected from the remote URL
+- **Draft = private/WIP** per the review flow; non-draft is public and queued for auto-merge
+- **Squash** merge strategy (per the "ENFORCE Squash" policy)
+- Auto-delete / remove source branch after merge
+- Switches back to main and pulls latest (only for non-draft requests)
 
 **Workflow:**
-1. **Commit:** Runs commit task
-2. **Create PR:** `gh pr create -t "<branch>" -b "<branch> branch into main"`
-3. **Wait:** 2s delay for PR creation
-4. **Auto-merge:** Enables auto-merge with rebase
-5. **Cleanup:** Deletes branch after merge
-6. **Switch to main:** Checks out main and pulls latest
+1. **Commit:** Runs the `commit` task
+2. **Detect platform:** Reads `git remote get-url origin` (`github` / `gitlab`), or asks if ambiguous
+3. **Title & description:** Prompted via `gum input` / `gum write`
+4. **Draft?:** `gum confirm` — Draft keeps the request private and skips auto-merge
+5. **Create request:**
+   - GitHub: `gh pr create --base main --head <branch> …`
+   - GitLab: `glab mr create --target-branch main --source-branch <branch> … --squash-before-merge`
+6. **Auto-merge (non-draft only):**
+   - GitHub: `gh pr merge --auto --squash --delete-branch`
+   - GitLab: `glab mr merge --squash --remove-source-branch --when-pipeline-succeeds`
+7. **Switch to main:** Only when the request was queued for merge (non-draft)
 
 **Requirements:**
-- GitHub CLI (`gh`) installed and authenticated
-- Branch protection rules configured (optional)
-- CI checks configured for auto-merge
+- GitHub CLI (`gh`) **or** GitLab CLI (`glab`) installed and authenticated
+- Branch protection / CI checks configured for auto-merge
 
 **Example:**
 ```bash
-git checkout -b feat/new-taskfile
+git checkout -b feature/cloud-42_new_taskfile
 # ... make changes ...
 task --taskfile taskfiles/git.yaml pr
-# Creates PR, waits for checks, auto-merges, switches to main
+# Detects the forge, prompts for title/description, asks Draft?,
+# then creates the PR/MR and (if non-draft) queues a squash auto-merge.
 ```
 
 </details>

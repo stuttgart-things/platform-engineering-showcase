@@ -94,11 +94,11 @@ tasks:
         TYPE=$(gum choose --header "Conventional Commits type (select 'none' to omit):" \
           none feat fix docs refactor test chore build ci perf "feat!")
 
-        # Ticket reference: UPPERCASE, PROJECT-NUMBER, validated in a loop
-        TICKET=$(gum input --header "Ticket reference (UPPERCASE, e.g. CLOUD-42):" \
-          --value "{{ .TICKET }}" --placeholder "PROJECT-123" | tr '[:lower:]' '[:upper:]')
-        while ! echo "$TICKET" | grep -qE '^[A-Z]+-[0-9]+$'; do
-          TICKET=$(gum input --header "Invalid — must be PROJECT-NUMBER (e.g. CLOUD-42):" \
+        # Ticket reference: optional. If given it must be UPPERCASE PROJECT-NUMBER (validated in a loop).
+        TICKET=$(gum input --header "Ticket reference (e.g. CLOUD-42; leave empty for none):" \
+          --value "{{ .TICKET }}" --placeholder "PROJECT-123 (optional)" | tr '[:lower:]' '[:upper:]')
+        while [[ -n "$TICKET" ]] && ! echo "$TICKET" | grep -qE '^[A-Z]+-[0-9]+$'; do
+          TICKET=$(gum input --header "Invalid — PROJECT-NUMBER (e.g. CLOUD-42), or leave empty:" \
             --value "$TICKET" | tr '[:lower:]' '[:upper:]')
         done
 
@@ -110,11 +110,11 @@ tasks:
             gum style --foreground 214 "Summary is required."
             continue
           fi
-          if [[ "$TYPE" == "none" ]]; then
-            SUBJECT="${TICKET}: ${SUMMARY}"
-          else
-            SUBJECT="${TYPE}: ${TICKET}: ${SUMMARY}"
-          fi
+          # Assemble [<type>: ][<TICKET>: ]<Summary> — each prefix part is optional
+          PREFIX=""
+          [[ "$TYPE" != "none" ]] && PREFIX="${TYPE}: "
+          [[ -n "$TICKET" ]] && PREFIX="${PREFIX}${TICKET}: "
+          SUBJECT="${PREFIX}${SUMMARY}"
           FIRST_CHAR="${SUMMARY:0:1}"
           if [[ "$FIRST_CHAR" != "$(echo "$FIRST_CHAR" | tr '[:lower:]' '[:upper:]')" ]]; then
             gum style --foreground 214 "Summary must start with a capital letter."
@@ -155,14 +155,55 @@ tasks:
         git push -u origin "$CURRENT_BRANCH"
 
   pr:
-    desc: Create pull request into main
+    desc: Create a pull/merge request into main (GitHub via gh, GitLab via glab)
     cmds:
       - task: commit
-      - gh pr create -t "{{ .BRANCH }}" -b "{{ .BRANCH }} branch into main"
-      - sleep 2s
-      # - gh pr checks $(gh pr list | grep "^[^#;]" | awk '{print $1}') --watch
-      - gh pr merge $(gh pr list | grep "^[^#;]" | grep '{{ .BRANCH }}' | awk '{print $1}') --auto --rebase --delete-branch
-      - git checkout main && git pull
+      - |
+        set -euo pipefail
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+        # Detect the forge from the origin remote; fall back to an interactive choice
+        REMOTE_URL=$(git remote get-url origin)
+        case "$REMOTE_URL" in
+          *github.com*) PLATFORM=github ;;
+          *gitlab*)     PLATFORM=gitlab ;;
+          *)            PLATFORM=$(gum choose --header "Git platform?" github gitlab) ;;
+        esac
+
+        gum style --border double --padding "1 2" --border-foreground 212 \
+          "🔀 git:pr — ${BRANCH} → main (${PLATFORM})"
+
+        TITLE=$(gum input --header "PR/MR title:" --value "$BRANCH")
+        BODY=$(gum write --header "Description (ctrl+d to finish, esc to skip):" --width 72 --height 8)
+
+        # Draft = private/WIP per the review flow; a non-draft request is public and auto-merges (squash)
+        DRAFT=""
+        if gum confirm "Create as Draft (private / WIP — no auto-merge)?"; then
+          DRAFT=1
+        fi
+
+        case "$PLATFORM" in
+          github)
+            gh pr create --base main --head "$BRANCH" \
+              --title "$TITLE" --body "$BODY" ${DRAFT:+--draft}
+            if [[ -z "$DRAFT" ]]; then
+              gh pr merge --auto --squash --delete-branch
+            fi
+            ;;
+          gitlab)
+            glab mr create --target-branch main --source-branch "$BRANCH" \
+              --title "$TITLE" --description "$BODY" --remove-source-branch --squash-before-merge \
+              ${DRAFT:+--draft} --yes
+            if [[ -z "$DRAFT" ]]; then
+              glab mr merge --squash --remove-source-branch --when-pipeline-succeeds --yes
+            fi
+            ;;
+        esac
+
+        # Only return to main when the request was actually queued for merge (non-draft)
+        if [[ -z "$DRAFT" ]]; then
+          git checkout main && git pull --rebase
+        fi
 
   issue:
     desc: Create github issue
