@@ -150,9 +150,9 @@ tasks:
 
         # 7) Sync with remote (rebase to keep history linear per ff-only policy) & push
         if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-          git pull --rebase --autostash
+          gum spin --title "Rebasing onto upstream…" --show-error -- git pull --rebase --autostash
         fi
-        git push -u origin "$CURRENT_BRANCH"
+        gum spin --title "Pushing to origin…" --show-error -- git push -u origin "$CURRENT_BRANCH"
 
   pr:
     desc: Create a pull/merge request into main (GitHub via gh, GitLab via glab)
@@ -202,7 +202,8 @@ tasks:
 
         # Only return to main when the request was actually queued for merge (non-draft)
         if [[ -z "$DRAFT" ]]; then
-          git checkout main && git pull --rebase
+          git checkout main
+          gum spin --title "Pulling main…" --show-error -- git pull --rebase
         fi
 
   issue:
@@ -242,7 +243,7 @@ tasks:
     desc: Create a convention-compliant branch from main (type + ticket + snake_case)
     cmds:
       - git checkout main
-      - git pull --rebase
+      - gum spin --title "Pulling main…" --show-error -- git pull --rebase
       - |
         set -euo pipefail
 
@@ -288,7 +289,7 @@ tasks:
         gum confirm "Create and push this branch?" || { gum style --foreground 214 "Aborted."; exit 0; }
 
         git checkout -b "$BRANCH_NAME"
-        git push -u origin "$BRANCH_NAME"
+        gum spin --title "Pushing new branch…" --show-error -- git push -u origin "$BRANCH_NAME"
 
   run-pre-commit-hook:
     deps:
@@ -331,7 +332,7 @@ tasks:
     desc: Switch to remote branch
     cmds:
       - |
-        git fetch
+        gum spin --title "Fetching…" --show-error -- git fetch
         branches=($(git branch -r | grep -v 'origin/HEAD' | sed 's|origin/||'))
         branch=$(printf "%s\n" "${branches[@]}" | gum choose)
         git switch -c ${branch} --track origin/${branch}
@@ -343,7 +344,8 @@ tasks:
       - |
         branches=$(git branch -a | grep -v 'remotes')
         branch=$(printf "%s\n" "${branches[@]}" | gum choose)
-        git checkout ${branch} && git pull
+        git checkout ${branch}
+        gum spin --title "Pulling…" --show-error -- git pull
 
   tag:
     desc: Create a SemVer tag (bump patch/minor/major from the latest tag)
@@ -384,4 +386,4 @@ tasks:
         gum confirm "Create and push tag ${NEXT}?" || { gum style --foreground 214 "Aborted."; exit 0; }
 
         git tag -a "$NEXT" -m "Release ${NEXT} on {{ .DATE }}"
-        git push origin "$NEXT"
+        gum spin --title "Pushing tag ${NEXT}…" --show-error -- git push origin "$NEXT"
