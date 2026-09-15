@@ -20,7 +20,7 @@ jobs:
       - name: Run Dagger PR Check
         uses: dagger/dagger-for-github@v8.4.1
         with:
-          version: v0.18.14
+          version: 0.21.9
           verb: call
           module: ./.dagger/postgresdb
           args: run-pr-check --source . --policy kyverno/policies -vv --progress plain
