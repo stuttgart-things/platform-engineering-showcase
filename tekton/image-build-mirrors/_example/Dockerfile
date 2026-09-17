@@ -9,7 +9,7 @@ RUN apk --no-cache add \
     alpine-sdk=2.4.5-r1 \
     libffi=3.4.2-r1 \
     libffi-dev=3.4.2-r1 \
-    musl-dev=1.2.4-r1 \
+    musl-dev=1.2.6-r2 \
     openssl-dev=3.1.3-r0 \
     postgresql-libs=15.3-r0
 
