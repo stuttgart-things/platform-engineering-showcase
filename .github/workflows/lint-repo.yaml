@@ -21,7 +21,8 @@ jobs:
       app-directory: "./"
       output-file: "/tmp/platform-engineering-showcase-lint-findings.txt"
       continue-error: "true"
-      dagger-version: v0.19.3
+      # >= 0.19.11 on Ubuntu 26.04 (github-workflow-templates#226)
+      dagger-version: v0.21.10
       dagger-module-version: v1.17.0
       branch-name: ${{ github.head_ref || github.ref_name }}
     secrets: inherit # pragma: allowlist secret
